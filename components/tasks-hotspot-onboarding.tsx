@@ -17,7 +17,7 @@ const steps: HotspotStep[] = [
   {
     id: "categories",
     title: "Categories",
-    description: "Categories are different types of tasks. They help organize your work by grouping similar tasks together. Categories are configured by your administrator to match your organization's workflow.",
+    description: "Organize your work by business type. Categories group tasks by workflow or function — for example, Legal, Financial, or Operations. They help you and your team see where each task belongs and keep processes consistent across the organization. (Configured by your admin to match how your business actually runs.)",
     elementId: "tasks-categories-sidebar",
     position: "right",
     icon: <Tag className="w-5 h-5" />,
@@ -25,7 +25,7 @@ const steps: HotspotStep[] = [
   {
     id: "quick-filters",
     title: "Quick Filters",
-    description: "Quick Filters use UNION logic - when you select multiple filters, you'll see ALL tasks that match ANY of the selected criteria. Think of it as combining sets: if you select 'Assigned to me' AND 'High Priority', you'll see tasks that are either assigned to you OR high priority (or both).",
+    description: "Your ready-made filter presets. Quick Filters are saved views built from Advanced Filters — shortcuts to help you focus fast. Instead of setting up conditions each time, just click a Quick Filter to see tasks that match key rules like \"My tasks\", \"Pending review\", or \"High priority\". It's your go-to helper for quick visibility and smoother daily work.",
     elementId: "tasks-quick-filters-chips",
     position: "bottom",
     icon: <Filter className="w-5 h-5" />,
@@ -33,7 +33,7 @@ const steps: HotspotStep[] = [
   {
     id: "advanced-filters",
     title: "Advanced Filters",
-    description: "If you need to narrow down your search more precisely, use Advanced Filters. They use AND logic to combine multiple conditions, showing only tasks that match ALL selected criteria. Click the 'Filter' button to open the modal and explore how it works - you'll see options for AI-powered filtering and standard filtering with multiple conditions.",
+    description: "Create custom rules for deeper focus. Advanced Filters let you build precise combinations of conditions — like Owner = Me AND Status = In Progress AND Due ≤ 7 days. They're great for fine-tuning what you see, analyzing work patterns, or setting up new Quick Filter presets for your team.",
     elementId: "tasks-advanced-filters",
     position: "bottom",
     icon: <Filter className="w-5 h-5" />,
@@ -81,17 +81,16 @@ export function TasksHotspotOnboarding({ onComplete, onSkip }: TasksHotspotOnboa
 
     const rect = element.getBoundingClientRect()
     const tooltipRect = tooltipRef.current.getBoundingClientRect()
-    const padding = 16
     const gap = 20
     const scrollY = window.scrollY
     const scrollX = window.scrollX
 
-    // Spotlight positioning - підсвітка елемента
+    // Spotlight positioning - підсвітка елемента точно по межах
     setSpotlightStyle({
-      left: `${rect.left - padding}px`,
-      top: `${rect.top - padding}px`,
-      width: `${rect.width + padding * 2}px`,
-      height: `${rect.height + padding * 2}px`,
+      left: `${rect.left + scrollX}px`,
+      top: `${rect.top + scrollY}px`,
+      width: `${rect.width}px`,
+      height: `${rect.height}px`,
       display: "block",
     })
 
@@ -172,7 +171,7 @@ export function TasksHotspotOnboarding({ onComplete, onSkip }: TasksHotspotOnboa
 
   return (
     <div className="fixed inset-0 z-[9998] pointer-events-none">
-      {/* Spotlight - підсвітка елемента без затемнення */}
+      {/* Spotlight - підсвітка елемента точно по межах */}
       <div
         className="absolute rounded-lg border-2 border-blue-500 pointer-events-none transition-all duration-300"
         style={spotlightStyle}
@@ -209,7 +208,7 @@ export function TasksHotspotOnboarding({ onComplete, onSkip }: TasksHotspotOnboa
         {step.id === "advanced-filters" && (
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-900">
-              💡 <strong>Try it now:</strong> Click the "Filter" button to see AI-powered filtering and standard filtering options in action.
+              💡 <strong>Try it now:</strong> Try opening the Filter modal to see both AI-powered and manual filtering in action.
             </p>
           </div>
         )}
