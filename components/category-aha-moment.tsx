@@ -13,25 +13,48 @@ interface CategoryAhaMomentProps {
 export function CategoryAhaMoment({ show, onClose, onNext }: CategoryAhaMomentProps) {
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
+  const [progress, setProgress] = useState({ completed: 0, total: 6 })
 
   useEffect(() => {
     if (show) {
       setMounted(true)
+      // Update progress when modal is shown
+      const updateProgress = () => {
+        try {
+          const savedProgress = localStorage.getItem("way2b1_module_progress")
+          if (savedProgress) {
+            const parsed = JSON.parse(savedProgress)
+            const completed = Object.values(parsed).filter(Boolean).length
+            setProgress({ completed, total: 6 })
+          }
+        } catch (e) {
+          console.error("Failed to parse progress", e)
+        }
+      }
+      updateProgress()
+      
+      // Listen for progress updates
+      window.addEventListener("onboardingProgressUpdate", updateProgress)
+      return () => {
+        window.removeEventListener("onboardingProgressUpdate", updateProgress)
+      }
     }
   }, [show])
 
   if (!show || !mounted) return null
 
   const handleNextStep = () => {
-    if (onNext) {
-      onNext()
-    } else {
-      // Navigate to Create teams module
-      localStorage.setItem("way2b1_active_module", "create-teams")
-      localStorage.setItem("way2b1_start_team_walkthrough", "true")
-      router.push("/team")
-    }
+    // Set flags for navigation BEFORE closing modal
+    localStorage.setItem("way2b1_active_module", "create-teams")
+    localStorage.setItem("way2b1_start_team_walkthrough", "true")
+    
+    // Close AHA moment first
     onClose()
+    
+    // Navigate after modal closes - use longer delay to ensure modal is fully closed
+    setTimeout(() => {
+      router.push("/team")
+    }, 500)
   }
 
   const handleClose = () => {
@@ -89,12 +112,7 @@ export function CategoryAhaMoment({ show, onClose, onNext }: CategoryAhaMomentPr
             <div className="bg-secondary rounded-lg p-4 mb-6">
               <div className="text-sm text-muted-foreground mb-2">Onboarding Progress</div>
               <div className="text-2xl font-bold text-foreground">
-                {(() => {
-                  const progress = JSON.parse(localStorage.getItem("way2b1_module_progress") || "{}")
-                  const completed = Object.values(progress).filter(Boolean).length
-                  const total = 6 // Total modules
-                  return `${completed} of ${total}`
-                })()}
+                {progress.completed} of {progress.total}
               </div>
             </div>
 

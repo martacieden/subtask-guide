@@ -72,6 +72,21 @@ export function CategoryWizard({ onClose, onComplete }: { onClose: () => void; o
     }
   }, [])
 
+  // Listen for walkthrough sync events
+  useEffect(() => {
+    const handleGotoStep = (event: CustomEvent) => {
+      const targetStep = event.detail?.step
+      if (targetStep && targetStep >= 1 && targetStep <= 5) {
+        setStep(targetStep)
+      }
+    }
+
+    window.addEventListener("category-wizard-goto-step", handleGotoStep as EventListener)
+    return () => {
+      window.removeEventListener("category-wizard-goto-step", handleGotoStep as EventListener)
+    }
+  }, [])
+
   const getIconComponent = (iconName: string) => {
     const iconOption = iconOptions.find((option) => option.name === iconName)
     return iconOption ? iconOption.icon : Folder
@@ -96,6 +111,10 @@ export function CategoryWizard({ onClose, onComplete }: { onClose: () => void; o
       return
     }
     if (step === 4) {
+      setStep(5)
+      return
+    }
+    if (step === 5) {
       // Final step - Create category and mark module as complete
       try {
         const categoryData = {
@@ -131,7 +150,8 @@ export function CategoryWizard({ onClose, onComplete }: { onClose: () => void; o
     { number: 1, title: "Enter category details", active: step === 1, completed: step > 1 },
     { number: 2, title: "Select category capsules", active: step === 2, completed: step > 2 },
     { number: 3, title: "Set up custom fields", active: step === 3, completed: step > 3 },
-    { number: 4, title: "Workflow configuration", active: step === 4, completed: false },
+    { number: 4, title: "Workflow configuration", active: step === 4, completed: step > 4 },
+    { number: 5, title: "Preview", active: step === 5, completed: false },
   ]
 
   return (
@@ -1004,6 +1024,87 @@ export function CategoryWizard({ onClose, onComplete }: { onClose: () => void; o
                 </div>
                 </div>
               )}
+
+              {step === 5 && (
+                <div className="space-y-4" id="category-wizard-step-5">
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">Preview</h3>
+                    <p className="text-[14px] text-gray-600 leading-relaxed">
+                      Review your category settings before creating it.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4 border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    {/* Category Name */}
+                    <div className="space-y-1">
+                      <div className="text-[12px] font-semibold text-gray-600 uppercase tracking-wide">Category Name</div>
+                      <div className="flex items-center gap-2">
+                        {(() => {
+                          const Icon = getIconComponent(draft.selectedIcon)
+                          return <Icon className="w-4 h-4 text-gray-600" />
+                        })()}
+                        <span className="text-[14px] font-medium text-gray-900">{draft.name || "Untitled Category"}</span>
+                      </div>
+                    </div>
+
+                    {/* Category Type */}
+                    <div className="space-y-1">
+                      <div className="text-[12px] font-semibold text-gray-600 uppercase tracking-wide">Category Type</div>
+                      <span className="text-[14px] text-gray-900">{draft.type}</span>
+                    </div>
+
+                    {/* Parent Category */}
+                    {draft.parent && (
+                      <div className="space-y-1">
+                        <div className="text-[12px] font-semibold text-gray-600 uppercase tracking-wide">Parent Category</div>
+                        <span className="text-[14px] text-gray-900">{draft.parent}</span>
+                      </div>
+                    )}
+
+                    {/* Permissions */}
+                    <div className="space-y-1">
+                      <div className="text-[12px] font-semibold text-gray-600 uppercase tracking-wide">Permissions</div>
+                      <span className="text-[14px] text-gray-900">
+                        {draft.permission === "view" ? "View content only" : "Create and manage content"}
+                      </span>
+                    </div>
+
+                    {/* Capsules */}
+                    <div className="space-y-1">
+                      <div className="text-[12px] font-semibold text-gray-600 uppercase tracking-wide">Enabled Capsules</div>
+                      <div className="flex flex-wrap gap-2">
+                        {draft.capsules
+                          .filter((c) => c.enabled)
+                          .map((c) => (
+                            <span
+                              key={c.id}
+                              className="px-2 py-1 text-[12px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded"
+                            >
+                              {c.id === "amounts" && "Track amounts & budgets"}
+                              {c.id === "attachments" && "Upload attachments"}
+                              {c.id === "linked" && "Link related items"}
+                              {c.id === "themes" && "Organize by themes"}
+                            </span>
+                          ))}
+                        {draft.capsules.filter((c) => c.enabled).length === 0 && (
+                          <span className="text-[13px] text-gray-500">No capsules enabled</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Workflow */}
+                    <div className="space-y-1">
+                      <div className="text-[12px] font-semibold text-gray-600 uppercase tracking-wide">Workflow</div>
+                      <span className="text-[14px] text-gray-900">
+                        {draft.workflowOption === "default" && "Use default workflow"}
+                        {draft.workflowOption === "existing" && `Selected: ${draft.selectedWorkflow || "None"}`}
+                        {draft.workflowOption === "adhoc" && "Set up ad hoc approval"}
+                        {draft.workflowOption === "create" && "Create new workflow"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
           </div>
             </div>
 
@@ -1018,14 +1119,28 @@ export function CategoryWizard({ onClose, onComplete }: { onClose: () => void; o
           <div className="flex items-center gap-3">
             {step > 1 && (
               <button
-                onClick={() => setStep(step - 1)}
+                onClick={() => {
+                  const newStep = step - 1
+                  setStep(newStep)
+                  // Sync with walkthrough
+                  // Walkthrough steps: 0="Create New Category" (before wizard, wizardStep:1), 1="Enter Details" (wizardStep:1), 2="Capsules" (wizardStep:2), etc.
+                  // When wizard is on step 1, walkthrough should be on step 1 (not step 0)
+                  // When wizard is on step 2, walkthrough should be on step 2
+                  // So: wizard step N maps to walkthrough step N
+                  const walkthroughStepIndex = newStep
+                  window.dispatchEvent(
+                    new CustomEvent("category-walkthrough-goto-step", {
+                      detail: { step: walkthroughStepIndex },
+                    })
+                  )
+                }}
                 className="px-4 py-2 text-[13px] font-semibold text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
               >
                 Go back
               </button>
             )}
             <button
-              id={step === 4 ? "category-wizard-create-btn" : "category-wizard-continue-btn"}
+              id={step === 5 ? "category-wizard-create-btn" : "category-wizard-continue-btn"}
               ref={nextBtnRef}
               onClick={handleContinue}
               disabled={!canContinue()}
@@ -1033,7 +1148,7 @@ export function CategoryWizard({ onClose, onComplete }: { onClose: () => void; o
                 !canContinue() ? "opacity-50 cursor-not-allowed" : ""
               }`}
             >
-              {step === 4 ? "Create" : "Continue"}
+              {step === 5 ? "Create" : "Continue"}
                 </button>
           </div>
         </div>

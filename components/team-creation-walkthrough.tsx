@@ -286,17 +286,17 @@ export function TeamCreationWalkthrough({ onClose, onStepComplete, onComplete }:
     let tooltipPos: React.CSSProperties = {}
 
     if (isInModal && modalContentRect) {
-      const margin = 24
+      const margin = 16
       const viewportWidth = window.innerWidth
-      const tooltipWidth = tooltipRect.width || 400
+      const tooltipWidth = tooltipRect.width || 340
 
       const spaceOnRight = viewportWidth - modalContentRect.right
       if (spaceOnRight >= tooltipWidth + margin) {
         tooltipPos = {
           left: `${modalContentRect.right + margin}px`,
-          top: `${Math.max(24, modalContentRect.top + 50)}px`,
+          top: `${Math.max(16, modalContentRect.top + 40)}px`,
           transform: "none",
-          maxWidth: `${Math.min(tooltipWidth, 400)}px`,
+          maxWidth: `${Math.min(tooltipWidth, 340)}px`,
         }
       } else {
         tooltipPos = {
@@ -391,42 +391,42 @@ export function TeamCreationWalkthrough({ onClose, onStepComplete, onComplete }:
           zIndex: 10001,
         }}
       >
-        <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start justify-between mb-3">
           <div className="flex-1">
-            <div className="text-sm font-medium text-primary mb-2">
+            <div className="text-xs font-medium text-primary mb-1">
               Step {currentStep + 1} of {teamCreationSteps.length}
             </div>
-            <h3 className="text-xl font-bold text-foreground">{step.title}</h3>
+            <h3 className="text-base font-bold text-foreground">{step.title}</h3>
           </div>
-          <button onClick={handleSkip} className="p-1 hover:bg-secondary rounded-lg transition-colors">
-            <X className="w-5 h-5 text-muted-foreground" />
+          <button onClick={handleSkip} className="p-0.5 hover:bg-secondary rounded-lg transition-colors">
+            <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
 
-        <p className="text-muted-foreground leading-relaxed">{step.content}</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">{step.content}</p>
 
         {/* Navigation buttons */}
-        <div className="flex items-center justify-between mt-6">
+        <div className="flex items-center justify-between mt-4">
           {/* Progress dots */}
-          <div className="flex gap-1.5">
+          <div className="flex gap-1">
             {teamCreationSteps.map((_, i) => (
               <div
                 key={i}
-                className={`w-2 h-2 rounded-full transition-all ${
-                  i === currentStep ? "bg-primary w-6" : "bg-border"
+                className={`w-1.5 h-1.5 rounded-full transition-all ${
+                  i === currentStep ? "bg-primary w-5" : "bg-border"
                 }`}
               />
             ))}
           </div>
 
           {/* Action buttons */}
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             {currentStep > 0 && (
               <button
                 onClick={handlePrev}
-                className="flex items-center gap-1 px-4 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-lg font-medium transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-lg text-xs font-medium transition-colors"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-3.5 h-3.5" />
                 Previous
               </button>
             )}
@@ -435,7 +435,7 @@ export function TeamCreationWalkthrough({ onClose, onStepComplete, onComplete }:
               <button
                 onClick={handleSkipStep}
                 disabled={!canSkipStep}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   canSkipStep
                     ? "bg-transparent hover:bg-secondary/50 text-muted-foreground"
                     : "bg-gray-100 text-gray-400 cursor-not-allowed opacity-50"
@@ -448,10 +448,10 @@ export function TeamCreationWalkthrough({ onClose, onStepComplete, onComplete }:
             {!step.waitForAction && (
               <button
                 onClick={handleNext}
-                className="flex items-center gap-1 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-medium transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs font-medium transition-colors"
               >
                 {isLastStep ? "Finish" : "Next"}
-                {!isLastStep && <ChevronRight className="w-4 h-4" />}
+                {!isLastStep && <ChevronRight className="w-3.5 h-3.5" />}
               </button>
             )}
           </div>

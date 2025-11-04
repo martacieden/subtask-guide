@@ -13,21 +13,9 @@ export function RoleSelector({ onComplete }: RoleSelectorProps) {
 
   const roles = [
     {
-      id: "family-principal",
-      title: "Family Principal",
-      description: "Oversee family office operations and major decisions",
-      icon: <Building2 className="w-6 h-6" />,
-      goals: [
-        "Review and approve key decisions",
-        "Monitor family portfolio performance",
-        "Collaborate with advisors",
-        "Track multi-family workflows",
-      ],
-    },
-    {
-      id: "investment-advisor",
-      title: "Investment Advisor",
-      description: "Manage investment strategies and portfolio decisions",
+      id: "wealth-advisor",
+      title: "Wealth Advisor",
+      description: "Manage investment strategies and provide financial advisory services",
       icon: <TrendingUp className="w-6 h-6" />,
       goals: [
         "Create investment decisions",
@@ -37,8 +25,8 @@ export function RoleSelector({ onComplete }: RoleSelectorProps) {
       ],
     },
     {
-      id: "operations-manager",
-      title: "Operations Manager",
+      id: "operations-team",
+      title: "Operations Team",
       description: "Handle day-to-day operations and task coordination",
       icon: <Briefcase className="w-6 h-6" />,
       goals: [
@@ -49,21 +37,21 @@ export function RoleSelector({ onComplete }: RoleSelectorProps) {
       ],
     },
     {
-      id: "compliance-officer",
-      title: "Compliance Officer",
-      description: "Ensure regulatory compliance and documentation",
-      icon: <Shield className="w-6 h-6" />,
+      id: "executive",
+      title: "Executive",
+      description: "Oversee family office operations and major decisions",
+      icon: <Building2 className="w-6 h-6" />,
       goals: [
-        "Review decision documentation",
-        "Manage compliance workflows",
-        "Track regulatory requirements",
-        "Audit decision history",
+        "Review and approve key decisions",
+        "Monitor family portfolio performance",
+        "Collaborate with advisors",
+        "Track multi-family workflows",
       ],
     },
     {
-      id: "team-collaborator",
-      title: "Team Collaborator",
-      description: "Contribute to decisions and collaborate with team",
+      id: "service-provider",
+      title: "Service Provider",
+      description: "Provide external services and support to the family office",
       icon: <Users className="w-6 h-6" />,
       goals: [
         "Complete assigned tasks",
@@ -73,11 +61,16 @@ export function RoleSelector({ onComplete }: RoleSelectorProps) {
       ],
     },
     {
-      id: "other",
-      title: "Other Role",
-      description: "Customize your experience",
+      id: "client",
+      title: "Client",
+      description: "Family member or client accessing the platform",
       icon: <UserCircle className="w-6 h-6" />,
-      goals: ["Explore all features", "Customize workflow", "Learn the platform", "Get started quickly"],
+      goals: [
+        "View family portfolio performance",
+        "Review decisions and approvals",
+        "Access documents and reports",
+        "Communicate with advisors",
+      ],
     },
   ]
 

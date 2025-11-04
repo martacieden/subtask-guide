@@ -180,26 +180,66 @@ export function ModuleChecklist() {
 
   const [showProgressAnimation, setShowProgressAnimation] = useState(false)
   const [showCompletionModal, setShowCompletionModal] = useState(false)
-  const [checklistHidden, setChecklistHidden] = useState(false)
+  // Перевіряємо чи користувач вже завершив онбординг раніше
+  const [checklistHidden, setChecklistHidden] = useState(() => {
+    if (typeof window === "undefined") return false
+    return localStorage.getItem("way2b1_onboarding_completed") === "true"
+  })
 
   useEffect(() => {
-    // Always start with all modules uncompleted (reset on every page load)
-    // Clear saved progress FIRST before setting state to ensure clean start
-    localStorage.removeItem("way2b1_module_progress")
-    localStorage.removeItem("way2b1_onboarding_completed")
-    localStorage.removeItem("way2b1_checklist_initialized")
-    localStorage.removeItem("way2b1_last_completed_module")
-    
-    // Force all modules to be uncompleted
-    setModules((prev) =>
-      prev.map((module) => ({
-        ...module,
-        completed: false,
-      })),
-    )
-    
-    // Dispatch event to update progress badge after clearing
-    setTimeout(() => window.dispatchEvent(new CustomEvent("onboardingProgressUpdate")), 0)
+    // Load initial progress from localStorage
+    const savedProgress = localStorage.getItem("way2b1_module_progress")
+    if (savedProgress) {
+      try {
+        const progress = JSON.parse(savedProgress)
+        setModules((prev) => {
+          const updated = prev.map((module) => ({
+            ...module,
+            completed: progress[module.id] || false,
+          }))
+          
+          // Перевіряємо чи всі модулі вже завершені
+          const allCompleted = updated.every((module) => progress[module.id] === true)
+          if (allCompleted && updated.length > 0) {
+            setChecklistHidden(true)
+          }
+          
+          return updated
+        })
+      } catch (e) {
+        console.error("Failed to parse progress", e)
+      }
+    }
+  }, [])
+
+  // Listen for progress updates from other components (e.g., CategoryWizard)
+  useEffect(() => {
+    const handleProgressUpdate = () => {
+      const savedProgress = localStorage.getItem("way2b1_module_progress")
+      if (savedProgress) {
+        try {
+          const progress = JSON.parse(savedProgress)
+          setModules((prev) =>
+            prev.map((module) => ({
+              ...module,
+              completed: progress[module.id] || false,
+            })),
+          )
+        } catch (e) {
+          console.error("Failed to parse progress", e)
+        }
+      }
+    }
+
+    // Initial load
+    handleProgressUpdate()
+
+    // Listen for updates
+    window.addEventListener("onboardingProgressUpdate", handleProgressUpdate)
+
+    return () => {
+      window.removeEventListener("onboardingProgressUpdate", handleProgressUpdate)
+    }
   }, [])
 
   useEffect(() => {
@@ -207,10 +247,12 @@ export function ModuleChecklist() {
     const totalCount = modules.length
 
     if (completedCount === totalCount && completedCount > 0) {
-      // Always show modal when all completed (even if seen before)
+      // Приховуємо чекліст одразу коли всі модулі завершені
+      setChecklistHidden(true)
+      localStorage.setItem("way2b1_onboarding_completed", "true")
+      // Показуємо модалку завершення
       setTimeout(() => {
         setShowCompletionModal(true)
-        localStorage.setItem("way2b1_onboarding_completed", "true")
       }, 500)
     }
   }, [modules])
@@ -268,10 +310,14 @@ export function ModuleChecklist() {
 
   const handleActionClick = (route: string, moduleId: string) => {
     localStorage.setItem("way2b1_active_module", moduleId)
-    if (moduleId === "create-category") {
+    if (moduleId === "setup-domains") {
+      // Redirect to decisions page and highlight New Category button with hotspot
       try {
         localStorage.setItem("way2b1_start_category_flow", "true")
+        localStorage.setItem("way2b1_highlight_new_category", "true")
       } catch {}
+      router.push("/decisions")
+      return
     }
     if (moduleId === "create-teams") {
       // Start walkthrough for creating teams
@@ -285,12 +331,6 @@ export function ModuleChecklist() {
       router.push("/team")
       return
     }
-    if (moduleId === "setup-domains") {
-      // Redirect to decisions page and highlight New Category button with hotspot
-      localStorage.setItem("way2b1_highlight_new_category", "true")
-      router.push("/decisions")
-      return
-    }
     router.push(route)
   }
 
@@ -299,11 +339,14 @@ export function ModuleChecklist() {
   const progress = (completedCount / totalCount) * 100
   const allCompleted = completedCount === totalCount && totalCount > 0
 
-  // Hide checklist after completion modal is shown and closed
-  if (checklistHidden || (allCompleted && localStorage.getItem("way2b1_onboarding_completed") === "true" && !showCompletionModal)) {
+  // Приховуємо чекліст якщо він вже прихований або всі модулі завершені
+  if (checklistHidden) {
     return (
       <>
         <ProgressAnimation show={showProgressAnimation} />
+        <CompletionModal show={showCompletionModal} onClose={() => {
+          setShowCompletionModal(false)
+        }} />
       </>
     )
   }

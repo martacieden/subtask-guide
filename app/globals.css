@@ -218,10 +218,10 @@
 .organization-walkthrough-tooltip {
   position: fixed;
   background: white;
-  border-radius: var(--radius-xl);
-  padding: 2rem;
-  max-width: 480px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  max-width: 340px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
   z-index: 10000;
   pointer-events: auto;
   /* Дозволяємо взаємодію тільки з толтіпом */

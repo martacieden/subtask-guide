@@ -8,13 +8,14 @@ export function AIAssistantButton() {
 
   return (
     <button
+      id="ai-assistant-button"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className="fixed bottom-6 right-6 bg-[#4F7CFF] text-white px-4 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all z-[9997] flex items-center gap-2 font-medium text-sm"
-      aria-label="Open AI Assistant"
+      aria-label="Open Fojo Assistant"
     >
       <Sparkles className="w-5 h-5" />
-      <span>AI Assistant</span>
+      <span>Fojo Assistant</span>
     </button>
   )
 }

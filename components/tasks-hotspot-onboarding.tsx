@@ -1,61 +1,71 @@
 "use client"
 
-import type React from "react"
 import { useState, useEffect, useRef } from "react"
-import { X, ChevronLeft, ChevronRight, Search, User, ArrowRight, CheckSquare } from "lucide-react"
+import { X, ArrowRight, Filter, Plus, FolderTree, CheckCircle2 } from "lucide-react"
+import { useRouter } from "next/navigation"
 
-interface WalkthroughStep {
+interface HotspotStep {
   id: string
   title: string
-  content: string
-  elementId: string | null
+  description: string
+  elementId: string
   position: "top" | "bottom" | "left" | "right" | "center"
+  icon: React.ReactNode
+  highlightNextTab?: string
+  highlightNextTabLabel?: string
 }
 
-const walkthroughSteps: WalkthroughStep[] = [
+const steps: HotspotStep[] = [
   {
-    id: "search",
-    title: "Швидкий пошук",
-    content: "Тут ви можете швидко знайти будь-яку інформацію в системі. Використовуйте ⌘K для відкриття пошуку з будь-якого місця.",
-    elementId: "user-search-input",
+    id: "quick-filters",
+    title: "Quick Filters",
+    description: "Quick Filters work as UNION logic - they show results that match ANY selected criteria. This means if you select multiple filters, you'll see all tasks that match any one of them.",
+    elementId: "tasks-quick-filters",
     position: "bottom",
+    icon: <Filter className="w-5 h-5" />,
   },
   {
-    id: "profile",
-    title: "Ваш профіль",
-    content: "Натисніть на профіль, щоб відкрити меню. Там знаходяться кнопки Support та Feedback - якщо у вас є питання чи проблеми, ви можете звернутися до нас або залишити відгук.",
-    elementId: "user-profile-avatar",
+    id: "advanced-filters",
+    title: "Advanced Filters",
+    description: "Advanced Filters use conditional logic (AND) to narrow down results precisely. Combine multiple conditions to find exactly what you're looking for.",
+    elementId: "tasks-advanced-filters",
     position: "bottom",
+    icon: <Filter className="w-5 h-5" />,
   },
   {
-    id: "current-gen",
-    title: "Перемикач середовища",
-    content: "Ця кнопка дозволяє перемикатися між різними середовищами. (Ми її потім приберемо)",
-    elementId: "user-current-gen-switch",
+    id: "table-customization",
+    title: "Table Customization",
+    description: "Customize your table columns to match your workflow. Show or hide columns, adjust their order, and organize your tasks exactly how you need.",
+    elementId: "tasks-table-customization",
     position: "bottom",
+    icon: <FolderTree className="w-5 h-5" />,
   },
   {
-    id: "next-tab",
-    title: "Ваш робочий простір",
-    content: "Тут ви знайдете всі призначені вам завдання та рішення. Це буде ваш основний робочий простір. Перейдіть до Tasks або Decisions, щоб почати роботу.",
-    elementId: "sidebar-tasks-link",
+    id: "navigate-decisions",
+    title: "Navigate to Decisions",
+    description: "Ready to explore more? Check out Decisions to see how categories work and manage your decision-making workflow.",
+    elementId: "sidebar-decisions-link",
     position: "right",
+    icon: <CheckCircle2 className="w-5 h-5" />,
+    highlightNextTab: "/decisions",
+    highlightNextTabLabel: "Decisions",
   },
 ]
 
-interface UserHomePageWalkthroughProps {
+interface TasksHotspotOnboardingProps {
   onComplete: () => void
   onSkip: () => void
 }
 
-export function UserHomePageWalkthrough({ onComplete, onSkip }: UserHomePageWalkthroughProps) {
+export function TasksHotspotOnboarding({ onComplete, onSkip }: TasksHotspotOnboardingProps) {
   const [currentStep, setCurrentStep] = useState(0)
   const [spotlightStyle, setSpotlightStyle] = useState<React.CSSProperties>({})
   const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({})
   const tooltipRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
-  const step = walkthroughSteps[currentStep]
-  const isLastStep = currentStep === walkthroughSteps.length - 1
+  const step = steps[currentStep]
+  const isLastStep = currentStep === steps.length - 1
 
   useEffect(() => {
     updatePositions()
@@ -136,7 +146,15 @@ export function UserHomePageWalkthrough({ onComplete, onSkip }: UserHomePageWalk
 
   const handleNext = () => {
     if (isLastStep) {
-      onComplete()
+      // На останньому кроці можна перейти на Decisions або завершити
+      if (step.highlightNextTab) {
+        // Зберігаємо, що треба показати highlight на Decisions
+        localStorage.setItem("way2b1_highlight_decisions", "true")
+        onComplete()
+        router.push(step.highlightNextTab)
+      } else {
+        onComplete()
+      }
     } else {
       setCurrentStep((prev) => prev + 1)
     }
@@ -166,21 +184,6 @@ export function UserHomePageWalkthrough({ onComplete, onSkip }: UserHomePageWalk
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [currentStep, isLastStep])
 
-  const getStepIcon = (stepId: string) => {
-    switch (stepId) {
-      case "search":
-        return <Search className="w-5 h-5" />
-      case "profile":
-        return <User className="w-5 h-5" />
-      case "current-gen":
-        return <ArrowRight className="w-5 h-5" />
-      case "next-tab":
-        return <CheckSquare className="w-5 h-5" />
-      default:
-        return null
-    }
-  }
-
   return (
     <div className="fixed inset-0 z-[9999] pointer-events-none">
       {/* Backdrop з затемненням */}
@@ -208,11 +211,11 @@ export function UserHomePageWalkthrough({ onComplete, onSkip }: UserHomePageWalk
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3 flex-1">
             <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-600 flex-shrink-0">
-              {getStepIcon(step.id)}
+              {step.icon}
             </div>
             <div className="flex-1">
               <div className="text-xs font-medium text-blue-600 mb-1">
-                Крок {currentStep + 1} з {walkthroughSteps.length}
+                Крок {currentStep + 1} з {steps.length}
               </div>
               <h3 className="text-lg font-bold text-gray-900">{step.title}</h3>
             </div>
@@ -225,11 +228,19 @@ export function UserHomePageWalkthrough({ onComplete, onSkip }: UserHomePageWalk
           </button>
         </div>
 
-        <p className="text-sm text-gray-600 leading-relaxed mb-6">{step.content}</p>
+        <p className="text-sm text-gray-600 leading-relaxed mb-6">{step.description}</p>
+
+        {step.highlightNextTab && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-900">
+              💡 Next: We'll show you <strong>{step.highlightNextTabLabel}</strong> next
+            </p>
+          </div>
+        )}
 
         {/* Індикатор прогресу */}
         <div className="flex items-center justify-center gap-1.5 mb-6">
-          {walkthroughSteps.map((_, i) => (
+          {steps.map((_, i) => (
             <div
               key={i}
               className={`h-2 rounded-full transition-all ${
@@ -254,7 +265,6 @@ export function UserHomePageWalkthrough({ onComplete, onSkip }: UserHomePageWalk
                 onClick={handlePrev}
                 className="flex items-center gap-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors text-sm"
               >
-                <ChevronLeft className="w-4 h-4" />
                 Назад
               </button>
             )}
@@ -263,7 +273,7 @@ export function UserHomePageWalkthrough({ onComplete, onSkip }: UserHomePageWalk
               className="flex items-center gap-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors text-sm"
             >
               {isLastStep ? "Завершити" : "Далі"}
-              {!isLastStep && <ChevronRight className="w-4 h-4" />}
+              {!isLastStep && <ArrowRight className="w-4 h-4" />}
             </button>
           </div>
         </div>
@@ -271,4 +281,6 @@ export function UserHomePageWalkthrough({ onComplete, onSkip }: UserHomePageWalk
     </div>
   )
 }
+
+
 

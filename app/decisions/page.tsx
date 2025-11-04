@@ -415,10 +415,12 @@ export default function DecisionsPage() {
               }
             }
             loadCategories()
-            // Show AHA moment after category creation
+            
+            // Wait for progress update to propagate, then show AHA moment
+            // This ensures the progress bar and badge are updated before showing the modal
             setTimeout(() => {
               setShowAhaMoment(true)
-            }, 500)
+            }, 800)
           }}
         />
       )}
@@ -429,13 +431,19 @@ export default function DecisionsPage() {
           show={true}
           onClose={() => {
             setShowAhaMoment(false)
-            // Navigate to dashboard after closing
-            setTimeout(() => {
-              router.push("/")
-            }, 300)
+            // Only navigate to dashboard if not navigating to next step
+            // Check if we're navigating to next step (flag set in handleNextStep)
+            const isNavigatingToNextStep = localStorage.getItem("way2b1_active_module") === "create-teams" && 
+                                          localStorage.getItem("way2b1_start_team_walkthrough") === "true"
+            if (!isNavigatingToNextStep) {
+              // Only navigate to dashboard if not going to teams
+              setTimeout(() => {
+                router.push("/")
+              }, 100)
+            }
           }}
           onNext={() => {
-            // Navigate to Create teams will be handled in CategoryAhaMoment
+            // Flag will be set in handleNextStep before this is called
           }}
         />
       )}

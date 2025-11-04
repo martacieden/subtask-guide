@@ -6,7 +6,6 @@ import { Topbar } from "@/components/topbar"
 import { Dashboard } from "@/components/dashboard"
 import { TutorialOverlay } from "@/components/tutorial-overlay"
 import { Hotspots } from "@/components/hotspots"
-import { WelcomeModal } from "@/components/welcome-modal"
 import { FeedbackSurvey } from "@/components/feedback-survey"
 import { RoleSelector } from "@/components/role-selector"
 import { TutorialCenter } from "@/components/tutorial-center"
@@ -16,8 +15,13 @@ import { ModuleCompletionModal } from "@/components/module-completion-modal"
 import { OnboardingTypeSelector } from "@/components/onboarding-type-selector"
 import { LearnByDoingFeedback } from "@/components/learn-by-doing-feedback"
 import { UserHomePageWalkthrough } from "@/components/user-homepage-walkthrough"
+import { LoginWithRole } from "@/components/login-with-role"
+import { NextGenWelcome } from "@/components/next-gen-welcome"
+import { HomepageStepperTour } from "@/components/homepage-stepper-tour"
 
 export default function Home() {
+  const [showLogin, setShowLogin] = useState(false)
+  const [showNextGenWelcome, setShowNextGenWelcome] = useState(false)
   const [showRoleSelector, setShowRoleSelector] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [flowType, setFlowType] = useState<"admin" | "advisor" | null>(null)
@@ -29,10 +33,10 @@ export default function Home() {
 
   const [tutorialActive, setTutorialActive] = useState(false)
   const [showHotspots, setShowHotspots] = useState(false)
-  const [showWelcome, setShowWelcome] = useState(false)
   const [showSurvey, setShowSurvey] = useState(false)
   const [showLearnFeedback, setShowLearnFeedback] = useState<any>(null)
   const [showUserWalkthrough, setShowUserWalkthrough] = useState(false)
+  const [showHomepageStepper, setShowHomepageStepper] = useState(false)
 
   // Check for module completion modal
   useEffect(() => {
@@ -115,6 +119,49 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
+    // Перевіряємо чи користувач вже залогінений
+    if (typeof window === "undefined") return
+    
+    const isLoggedIn = localStorage.getItem("way2b1_logged_in")
+    const hasSeenNextGenWelcome = localStorage.getItem("way2b1_next_gen_welcome_seen")
+    
+    // Якщо не залогінений - показуємо логін
+    if (!isLoggedIn) {
+      setShowLogin(true)
+      return
+    }
+    
+    // Перевіряємо чи треба показати NextGenWelcome після логіну
+    const shouldShowNextGenWelcome = localStorage.getItem("way2b1_show_next_gen_welcome") === "true"
+    if (isLoggedIn && shouldShowNextGenWelcome && !hasSeenNextGenWelcome) {
+      localStorage.removeItem("way2b1_show_next_gen_welcome")
+      setShowNextGenWelcome(true)
+      return
+    }
+    
+    // Якщо залогінений але не бачив Next Gen Welcome - показуємо welcome
+    if (isLoggedIn && !hasSeenNextGenWelcome) {
+      setShowNextGenWelcome(true)
+      return
+    }
+    
+    // Якщо залогінений і вже бачив Next Gen Welcome - перевіряємо чи бачив stepper tour
+    if (isLoggedIn && hasSeenNextGenWelcome) {
+      const hasSeenStepper = localStorage.getItem("way2b1_homepage_stepper_seen")
+      if (!hasSeenStepper) {
+        setTimeout(() => {
+          setShowHomepageStepper(true)
+        }, 500)
+      } else {
+        setTimeout(() => {
+          setShowHotspots(true)
+        }, 500)
+      }
+    }
+  }, [])
+  
+  useEffect(() => {
+    // Якщо все пройдено - показуємо основний контент
     const SURVEY_COOLDOWN_HOURS = 24
     const canShowSurvey = () => {
       if (typeof window === "undefined") return false
@@ -123,9 +170,6 @@ export default function Home() {
       const elapsed = Date.now() - Number(last)
       return elapsed > SURVEY_COOLDOWN_HOURS * 60 * 60 * 1000
     }
-    
-    // Перевіряємо збережені налаштування (тільки на клієнті)
-    if (typeof window === "undefined") return
     
     const savedFlowType = localStorage.getItem("way2b1_flow_type")
     const savedRole = localStorage.getItem("way2b1_user_role")
@@ -251,19 +295,6 @@ export default function Home() {
     }, 2000)
   }
 
-  const handleWelcomeComplete = () => {
-    setShowWelcome(false)
-    setShowHotspots(true)
-    localStorage.setItem("way2b1_visited", "true")
-    console.log("[v0] Welcome flow completed")
-  }
-
-  const handleSkipTutorial = () => {
-    setShowWelcome(false)
-    setShowHotspots(true)
-    localStorage.setItem("way2b1_visited", "true")
-    console.log("[v0] Tutorial skipped")
-  }
 
   const handleUserWalkthroughComplete = () => {
     setShowUserWalkthrough(false)
@@ -309,6 +340,78 @@ export default function Home() {
     setShowOnboardingTypeSelector(true)
   }
 
+  const handleLogin = (email: string, role: string, position: string, firstName?: string, lastName?: string, phone?: string) => {
+    // Зберігаємо дані логіну
+    localStorage.setItem("way2b1_logged_in", "true")
+    localStorage.setItem("way2b1_user_email", email)
+    localStorage.setItem("way2b1_user_role", role)
+    localStorage.setItem("way2b1_user_position", position)
+    
+    // Зберігаємо дані профілю
+    if (firstName) localStorage.setItem("way2b1_user_first_name", firstName)
+    if (lastName) localStorage.setItem("way2b1_user_last_name", lastName)
+    if (phone) localStorage.setItem("way2b1_user_phone", phone)
+    
+    // Визначаємо flowType на основі ролі
+    const isAdmin = role === "family-principal" || role === "operations-manager" || role === "cfo-accountant"
+    const flowType = isAdmin ? "admin" : "advisor"
+    localStorage.setItem("way2b1_flow_type", flowType)
+    setFlowType(flowType)
+    setUserRole(role)
+    
+    setShowLogin(false)
+    // Після заповнення профілю - показуємо NextGenWelcome одразу на Home Page
+    // Встановлюємо прапорець, що треба показати NextGenWelcome
+    localStorage.setItem("way2b1_show_next_gen_welcome", "true")
+    // Показуємо NextGenWelcome одразу
+    setShowNextGenWelcome(true)
+  }
+
+  const handleNextGenWelcomeComplete = () => {
+    localStorage.setItem("way2b1_next_gen_welcome_seen", "true")
+    setShowNextGenWelcome(false)
+    // Після NextGenWelcome показуємо stepper tour
+    setTimeout(() => {
+      setShowHomepageStepper(true)
+    }, 500)
+  }
+
+  const handleNextGenWelcomeSkip = () => {
+    localStorage.setItem("way2b1_next_gen_welcome_seen", "true")
+    setShowNextGenWelcome(false)
+    // Після пропуску NextGenWelcome показуємо stepper tour
+    setTimeout(() => {
+      setShowHomepageStepper(true)
+    }, 500)
+  }
+
+  const handleHomepageStepperComplete = () => {
+    localStorage.setItem("way2b1_homepage_stepper_seen", "true")
+    setShowHomepageStepper(false)
+    // Після завершення stepper tour показуємо hotspots
+    setTimeout(() => {
+      setShowHotspots(true)
+    }, 300)
+  }
+
+  const handleHomepageStepperSkip = () => {
+    localStorage.setItem("way2b1_homepage_stepper_seen", "true")
+    setShowHomepageStepper(false)
+    // Після пропуску stepper tour показуємо hotspots
+    setTimeout(() => {
+      setShowHotspots(true)
+    }, 300)
+  }
+
+  // Якщо показуємо логін - не показуємо основний контент
+  if (showLogin) {
+    return (
+      <>
+        {showLogin && <LoginWithRole onLogin={handleLogin} />}
+      </>
+    )
+  }
+
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar 
@@ -318,7 +421,7 @@ export default function Home() {
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar />
-        <main className="flex-1 overflow-auto px-16 pb-6 pt-0">
+        <main className="flex-1 overflow-auto pb-6 pt-0 flex flex-col">
           <Dashboard />
         </main>
       </div>
@@ -340,7 +443,19 @@ export default function Home() {
 
       {showRoleSelector && <RoleSelector onComplete={handleRoleComplete} />}
 
-      {showWelcome && <WelcomeModal onComplete={handleWelcomeComplete} onSkip={handleSkipTutorial} />}
+      {showNextGenWelcome && (
+        <NextGenWelcome 
+          onComplete={handleNextGenWelcomeComplete} 
+          onSkip={handleNextGenWelcomeSkip} 
+        />
+      )}
+
+      {showHomepageStepper && (
+        <HomepageStepperTour 
+          onComplete={handleHomepageStepperComplete} 
+          onSkip={handleHomepageStepperSkip} 
+        />
+      )}
 
       {tutorialActive && <TutorialOverlay onEnd={handleEndTutorial} />}
       {showHotspots && <Hotspots />}
