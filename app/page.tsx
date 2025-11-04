@@ -183,9 +183,7 @@ export default function Home() {
       if (savedRole) {
         setUserRole(savedRole)
         if (!hasVisited) {
-          setTimeout(() => {
-            setShowWelcome(true)
-          }, 1000)
+          // Логіка welcome тепер обробляється в іншому useEffect
         } else {
           setShowHotspots(true)
           if (!surveyShown && canShowSurvey()) {
@@ -248,19 +246,11 @@ export default function Home() {
         setTimeout(() => {
           setShowUserWalkthrough(true)
         }, 500)
-      } else {
-        // Якщо вже бачив walkthrough, показуємо welcome modal
-        setTimeout(() => {
-          setShowWelcome(true)
-        }, 500)
       }
       return
     }
 
-    // Показуємо welcome modal після вибору типу onboarding (для admin)
-    setTimeout(() => {
-      setShowWelcome(true)
-    }, 500)
+    // Для admin логіка welcome обробляється в іншому useEffect через NextGenWelcome
   }
 
   const handleRoleComplete = (role: string, goals: string[]) => {
@@ -272,14 +262,10 @@ export default function Home() {
     // Track analytics
     console.log("[v0] User role selected:", role, "Goals:", goals)
 
-    // Show welcome modal after role selection
-    setTimeout(() => {
-      setShowWelcome(true)
-    }, 500)
+    // Логіка welcome тепер обробляється в іншому useEffect через NextGenWelcome
   }
 
   const handleStartTutorial = () => {
-    setShowWelcome(false)
     setTutorialActive(true)
     setShowHotspots(false)
     console.log("[v0] Tutorial started")

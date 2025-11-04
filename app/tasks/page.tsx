@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { TasksEmptyState } from "@/components/tasks-empty-state"
 import { TasksTable } from "@/components/tasks-table"
 import { TasksHotspotOnboarding } from "@/components/tasks-hotspot-onboarding"
+import { AdvancedFiltersModal } from "@/components/advanced-filters-modal"
 import {
   Plus,
   Search,
@@ -17,6 +18,20 @@ import {
   Share2,
   ChevronDown,
   Grid3x3,
+  FileText,
+  User,
+  FolderTree,
+  Building2,
+  Monitor,
+  ArrowRight,
+  SquareCheckBig,
+  DollarSign,
+  Plane,
+  RefreshCw,
+  Users,
+  TrendingUp,
+  Gavel,
+  List,
 } from "lucide-react"
 
 // Mock data для тестування заповненого стану
@@ -93,14 +108,60 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<any[]>([])
   const [showHotspotOnboarding, setShowHotspotOnboarding] = useState(false)
   const [selectedTasks, setSelectedTasks] = useState<string[]>([])
-  const [activeQuickFilter, setActiveQuickFilter] = useState<string>("all")
+  const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [groupByParent, setGroupByParent] = useState(false)
   const [visibleColumns, setVisibleColumns] = useState(13)
   const [totalColumns, setTotalColumns] = useState(14)
 
+  // Дефолтні категорії (окрім G2B)
+  const defaultCategories = [
+    { id: "accounting", name: "Accounting", icon: DollarSign },
+    { id: "capital-projects", name: "Capital Projects", icon: Plane },
+    { id: "compliance", name: "Compliance", icon: RefreshCw },
+    { id: "facilities", name: "Facilities", icon: Building2 },
+    { id: "human-resources", name: "Human Resources", icon: Users },
+    { id: "investment", name: "Investment", icon: TrendingUp },
+    { id: "it", name: "IT", icon: Monitor },
+    { id: "legal", name: "Legal", icon: Gavel },
+    { id: "lifestyle", name: "Lifestyle", icon: Plane },
+  ]
+
+  // Отримуємо категорії: дефолтні + унікальні з tasks (якщо є додаткові)
+  const getCategories = () => {
+    const taskCategories = new Set<string>()
+    tasks.forEach(task => {
+      if (task.category && task.category !== "—") {
+        taskCategories.add(task.category)
+      }
+    })
+
+    // Додаємо дефолтні категорії з кількістю задач
+    const allCategories = defaultCategories.map(cat => ({
+      ...cat,
+      count: tasks.filter(t => t.category === cat.name).length,
+    }))
+
+    // Додаємо додаткові категорії з tasks, які не в дефолтному списку
+    const defaultCategoryNames = new Set(defaultCategories.map(c => c.name))
+    taskCategories.forEach(categoryName => {
+      if (!defaultCategoryNames.has(categoryName)) {
+        allCategories.push({
+          id: categoryName.toLowerCase().replace(/\s+/g, "-"),
+          name: categoryName,
+          icon: FolderTree, // Default icon для невідомих категорій
+          count: tasks.filter(t => t.category === categoryName).length,
+        })
+      }
+    })
+
+    return allCategories
+  }
+
+  const categories = getCategories()
+
   // Quick filter options
   const quickFilters = [
-    { id: "all", label: "All Tasks" },
     { id: "assigned-to-me", label: "Assigned to me" },
     { id: "created-by-me", label: "Created by me" },
     { id: "overdue", label: "Overdue" },
@@ -149,10 +210,9 @@ export default function TasksPage() {
           setTasks(mockTasks)
         }
       } else {
-        // Для демонстрації - використовуємо mock дані
-        // Для порожнього стану залиште setTasks([])
-        // setTasks([]) // Порожній стан
-        setTasks(mockTasks) // Заповнений стан
+        // Для демонстрації - використовуємо порожній стан для показу empty state
+        setTasks([]) // Порожній стан
+        // setTasks(mockTasks) // Заповнений стан для тестування
       }
     }
   }, [])
@@ -215,123 +275,157 @@ export default function TasksPage() {
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar />
+        
+        {/* Title "Tasks" - одразу під Topbar */}
+        <div className="border-b border-border bg-card px-6 py-4">
+          <h1 className="text-xl font-semibold text-foreground">Tasks</h1>
+        </div>
+
         <main className="flex-1 overflow-auto">
-          <div className="flex h-full flex-col">
-            {/* Top Bar */}
-            <div className="border-b border-border bg-card px-6 py-4">
+          <div className="flex h-full">
+            {/* Left Sidebar - Categories */}
+            <div 
+              id="tasks-categories-sidebar" 
+              className="border-r border-border bg-card" 
+              style={{ 
+                display: 'flex', 
+                width: '206px', 
+                flexDirection: 'column', 
+                alignItems: 'flex-start',
+                padding: '8px',
+                boxSizing: 'border-box'
+              }}
+            >
+              <div className="space-y-1 w-full">
+                {/* Always show "All Tasks" tab */}
+                <button
+                  onClick={() => setSelectedCategory(null)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                    selectedCategory === null ? "bg-primary/10 text-primary font-medium" : "text-foreground hover:bg-secondary"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <SquareCheckBig className="w-4 h-4" />
+                    <span>All Tasks</span>
+                  </div>
+                  <span className={`text-xs ${selectedCategory === null ? "text-primary" : "text-muted-foreground"}`}>
+                    {tasks.length}
+                  </span>
+                </button>
+
+                {/* Show categories if they exist */}
+                {categories.length > 0 && (
+                  <>
+                    {categories.map((category) => {
+                      const Icon = category.icon
+                      const isSelected = selectedCategory === category.id
+                      return (
+                        <button
+                          key={category.id}
+                          onClick={() => setSelectedCategory(category.id)}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                            isSelected ? "bg-primary/10 text-primary font-medium" : "text-foreground hover:bg-secondary"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Icon className="w-4 h-4" />
+                            <span>{category.name}</span>
+                          </div>
+                          <span className={`text-xs ${isSelected ? "text-primary" : "text-muted-foreground"}`}>
+                            {category.count}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </>
+                )}
+              </div>
+              
+              <button 
+                className="w-full flex items-center gap-2 px-3 py-2 mt-4 text-sm text-muted-foreground hover:text-foreground transition-colors border border-border rounded-lg"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New category</span>
+              </button>
+            </div>
+
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col">
+
+            {/* Controls Bar - показується завжди */}
+            <div className="border-b border-border bg-secondary/30 px-6 py-3">
               <div className="flex items-center justify-between">
-                <h1 className="text-xl font-semibold text-foreground">Tasks</h1>
                 <div className="flex items-center gap-4">
-                  <Button 
-                    id="tasks-quick-filters"
-                    variant="outline" 
-                    size="sm" 
-                    className="gap-2 bg-transparent"
+                  {/* Filter button */}
+                  <AdvancedFiltersModal
+                    onApply={(filters, aiQuery) => {
+                      // TODO: Застосувати фільтри
+                      console.log("Applied filters:", filters, "AI query:", aiQuery)
+                    }}
                   >
-                    <Filter className="w-4 h-4" />
-                    Quick Filters
-                  </Button>
-                  <Button 
-                    id="tasks-advanced-filters"
-                    variant="outline" 
-                    size="sm" 
-                    className="gap-2 bg-transparent"
-                  >
-                    <Filter className="w-4 h-4" />
-                    Advanced Filters
-                  </Button>
+                    <Button 
+                      id="tasks-advanced-filters"
+                      variant="outline" 
+                      size="sm" 
+                      className="gap-2 bg-transparent"
+                    >
+                      <Filter className="w-4 h-4" />
+                      Filter
+                    </Button>
+                  </AdvancedFiltersModal>
+
+                  {/* Columns count - налаштуй view, яке тобі зручне - вибирай колонки і пересортуй їх як зручно */}
                   <Button 
                     id="tasks-table-customization"
                     variant="outline" 
                     size="sm" 
                     className="gap-2 bg-transparent"
+                    title="Налаштуй view, яке тобі зручне - вибирай колонки і пересортуй їх як зручно"
                   >
                     <Columns3 className="w-4 h-4" />
                     {visibleColumns}/{totalColumns} columns
                   </Button>
-                  <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-                    <Search className="w-4 h-4" />
-                    Search
-                  </Button>
-                  <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-                    <Share2 className="w-4 h-4" />
-                    Share
-                  </Button>
-                  <Button
-                    id="tasks-new-task-button"
-                    onClick={handleCreateTask}
-                    className="flex items-center gap-2 bg-[#4F7CFF] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#4F7CFF]/90 transition-colors"
+
+                  {/* Group by parent - без checkbox */}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="gap-2 bg-transparent"
                   >
-                    <Plus className="w-4 h-4" />
-                    New Task
+                    <FolderTree className="w-4 h-4" />
+                    Group by parent
                   </Button>
                 </div>
+
+                <Button
+                  id="tasks-new-task-button"
+                  onClick={handleCreateTask}
+                  className="flex items-center gap-2 bg-[#4F7CFF] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#4F7CFF]/90 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  New Task
+                </Button>
               </div>
             </div>
 
-            {/* Controls Bar - показується тільки коли є задачі */}
-            {hasTasks && (
-              <div className="border-b border-border bg-secondary/30 px-6 py-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    {/* All Tasks button */}
-                    <button
-                      onClick={() => setActiveQuickFilter("all")}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        activeQuickFilter === "all"
-                          ? "bg-[#4F7CFF] text-white"
-                          : "bg-transparent text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      All Tasks
-                    </button>
-
-                    {/* Filter button */}
-                    <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-                      <Filter className="w-4 h-4" />
-                      Filter
-                    </Button>
-
-                    {/* Columns count */}
-                    <span className="text-sm text-muted-foreground">
-                      {visibleColumns}/{totalColumns} columns
-                    </span>
-
-                    {/* Group by parent checkbox */}
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="group-by-parent"
-                        checked={groupByParent}
-                        onCheckedChange={(checked) => setGroupByParent(checked as boolean)}
-                      />
-                      <label
-                        htmlFor="group-by-parent"
-                        className="text-sm text-muted-foreground cursor-pointer"
-                      >
-                        Group by parent
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Quick filter tabs */}
-                  <div className="flex items-center gap-2">
-                    {quickFilters.slice(1).map((filter) => (
-                      <button
-                        key={filter.id}
-                        onClick={() => setActiveQuickFilter(filter.id)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                          activeQuickFilter === filter.id
-                            ? "bg-primary/10 text-primary"
-                            : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary"
-                        }`}
-                      >
-                        {filter.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+            {/* Quick Filters - показуються завжди */}
+            <div className="border-b border-border bg-secondary/30 px-6 py-3">
+              <div id="tasks-quick-filters-chips" className="flex items-center gap-2">
+                {quickFilters.map((filter) => (
+                  <button
+                    key={filter.id}
+                    onClick={() => setActiveQuickFilter(filter.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      activeQuickFilter === filter.id
+                        ? "bg-[#4F7CFF] text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
 
             {/* Table Header - показується тільки коли є задачі */}
             {hasTasks && (
@@ -368,7 +462,7 @@ export default function TasksPage() {
                     REPORTER
                     <MoreHorizontal className="w-4 h-4" />
                   </div>
-                  <div className="col-span-1 flex items-center gap-2">
+                  <div id="tasks-category-column" className="col-span-1 flex items-center gap-2">
                     CATEGORY
                     <MoreHorizontal className="w-4 h-4" />
                   </div>
@@ -408,6 +502,7 @@ export default function TasksPage() {
                 <span>Filtered: {filteredTasks.length}</span>
               </div>
             </div>
+            </div>
           </div>
         </main>
       </div>
@@ -425,6 +520,7 @@ export default function TasksPage() {
           }}
         />
       )}
+
     </div>
   )
 }

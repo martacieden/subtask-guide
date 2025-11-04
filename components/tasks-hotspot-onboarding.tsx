@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { X, ArrowRight, Filter, Plus, FolderTree, CheckCircle2 } from "lucide-react"
+import { X, ArrowRight, Filter, Tag } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 interface HotspotStep {
@@ -9,46 +9,34 @@ interface HotspotStep {
   title: string
   description: string
   elementId: string
-  position: "top" | "bottom" | "left" | "right" | "center"
+  position: "top" | "bottom" | "left" | "right"
   icon: React.ReactNode
-  highlightNextTab?: string
-  highlightNextTabLabel?: string
 }
 
 const steps: HotspotStep[] = [
   {
+    id: "categories",
+    title: "Categories",
+    description: "Categories are different types of tasks. They help organize your work by grouping similar tasks together. Categories are configured by your administrator to match your organization's workflow.",
+    elementId: "tasks-categories-sidebar",
+    position: "right",
+    icon: <Tag className="w-5 h-5" />,
+  },
+  {
     id: "quick-filters",
     title: "Quick Filters",
-    description: "Quick Filters work as UNION logic - they show results that match ANY selected criteria. This means if you select multiple filters, you'll see all tasks that match any one of them.",
-    elementId: "tasks-quick-filters",
+    description: "Quick Filters use UNION logic - when you select multiple filters, you'll see ALL tasks that match ANY of the selected criteria. Think of it as combining sets: if you select 'Assigned to me' AND 'High Priority', you'll see tasks that are either assigned to you OR high priority (or both).",
+    elementId: "tasks-quick-filters-chips",
     position: "bottom",
     icon: <Filter className="w-5 h-5" />,
   },
   {
     id: "advanced-filters",
     title: "Advanced Filters",
-    description: "Advanced Filters use conditional logic (AND) to narrow down results precisely. Combine multiple conditions to find exactly what you're looking for.",
+    description: "If you need to narrow down your search more precisely, use Advanced Filters. They use AND logic to combine multiple conditions, showing only tasks that match ALL selected criteria. Click the 'Filter' button to open the modal and explore how it works - you'll see options for AI-powered filtering and standard filtering with multiple conditions.",
     elementId: "tasks-advanced-filters",
     position: "bottom",
     icon: <Filter className="w-5 h-5" />,
-  },
-  {
-    id: "table-customization",
-    title: "Table Customization",
-    description: "Customize your table columns to match your workflow. Show or hide columns, adjust their order, and organize your tasks exactly how you need.",
-    elementId: "tasks-table-customization",
-    position: "bottom",
-    icon: <FolderTree className="w-5 h-5" />,
-  },
-  {
-    id: "navigate-decisions",
-    title: "Navigate to Decisions",
-    description: "Ready to explore more? Check out Decisions to see how categories work and manage your decision-making workflow.",
-    elementId: "sidebar-decisions-link",
-    position: "right",
-    icon: <CheckCircle2 className="w-5 h-5" />,
-    highlightNextTab: "/decisions",
-    highlightNextTabLabel: "Decisions",
   },
 ]
 
@@ -70,7 +58,11 @@ export function TasksHotspotOnboarding({ onComplete, onSkip }: TasksHotspotOnboa
   useEffect(() => {
     updatePositions()
     window.addEventListener("resize", updatePositions)
-    return () => window.removeEventListener("resize", updatePositions)
+    window.addEventListener("scroll", updatePositions)
+    return () => {
+      window.removeEventListener("resize", updatePositions)
+      window.removeEventListener("scroll", updatePositions)
+    }
   }, [currentStep])
 
   const updatePositions = () => {
@@ -90,6 +82,9 @@ export function TasksHotspotOnboarding({ onComplete, onSkip }: TasksHotspotOnboa
     const rect = element.getBoundingClientRect()
     const tooltipRect = tooltipRef.current.getBoundingClientRect()
     const padding = 16
+    const gap = 20
+    const scrollY = window.scrollY
+    const scrollX = window.scrollX
 
     // Spotlight positioning - підсвітка елемента
     setSpotlightStyle({
@@ -101,60 +96,51 @@ export function TasksHotspotOnboarding({ onComplete, onSkip }: TasksHotspotOnboa
     })
 
     // Tooltip positioning - позиціонування підказки
-    let tooltipPos: React.CSSProperties = {}
+    let left = 0
+    let top = 0
 
     switch (step.position) {
       case "bottom":
-        tooltipPos = {
-          left: `${rect.left + rect.width / 2}px`,
-          top: `${rect.bottom + 24}px`,
-          transform: "translateX(-50%)",
-        }
+        left = rect.left + scrollX + rect.width / 2 - tooltipRect.width / 2
+        top = rect.bottom + scrollY + gap
         break
       case "top":
-        tooltipPos = {
-          left: `${rect.left + rect.width / 2}px`,
-          top: `${rect.top - tooltipRect.height - 24}px`,
-          transform: "translateX(-50%)",
-        }
+        left = rect.left + scrollX + rect.width / 2 - tooltipRect.width / 2
+        top = rect.top + scrollY - tooltipRect.height - gap
         break
       case "left":
-        tooltipPos = {
-          left: `${rect.left - tooltipRect.width - 24}px`,
-          top: `${rect.top + rect.height / 2}px`,
-          transform: "translateY(-50%)",
-        }
+        left = rect.left + scrollX - tooltipRect.width - gap
+        top = rect.top + scrollY + rect.height / 2 - tooltipRect.height / 2
         break
       case "right":
-        tooltipPos = {
-          left: `${rect.right + 24}px`,
-          top: `${rect.top + rect.height / 2}px`,
-          transform: "translateY(-50%)",
-        }
-        break
-      case "center":
-        tooltipPos = {
-          left: "50%",
-          top: "50%",
-          transform: "translate(-50%, -50%)",
-        }
+        left = rect.right + scrollX + gap
+        top = rect.top + scrollY + rect.height / 2 - tooltipRect.height / 2
         break
     }
 
-    setTooltipStyle(tooltipPos)
+    // Перевірка на вихід за межі екрану
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
+
+    if (left < 20) left = 20
+    if (left + tooltipRect.width > viewportWidth - 20) {
+      left = viewportWidth - tooltipRect.width - 20
+    }
+
+    if (top < 20) top = 20
+    if (top + tooltipRect.height > viewportHeight + scrollY - 20) {
+      top = viewportHeight + scrollY - tooltipRect.height - 20
+    }
+
+    setTooltipStyle({
+      left: `${left}px`,
+      top: `${top}px`,
+    })
   }
 
   const handleNext = () => {
     if (isLastStep) {
-      // На останньому кроці можна перейти на Decisions або завершити
-      if (step.highlightNextTab) {
-        // Зберігаємо, що треба показати highlight на Decisions
-        localStorage.setItem("way2b1_highlight_decisions", "true")
-        onComplete()
-        router.push(step.highlightNextTab)
-      } else {
-        onComplete()
-      }
+      onComplete()
     } else {
       setCurrentStep((prev) => prev + 1)
     }
@@ -174,9 +160,9 @@ export function TasksHotspotOnboarding({ onComplete, onSkip }: TasksHotspotOnboa
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         handleSkip()
-      } else if (e.key === "ArrowRight" && !isLastStep) {
+      } else if (e.key === "ArrowRight") {
         handleNext()
-      } else if (e.key === "ArrowLeft" && currentStep > 0) {
+      } else if (e.key === "ArrowLeft") {
         handlePrev()
       }
     }
@@ -185,28 +171,18 @@ export function TasksHotspotOnboarding({ onComplete, onSkip }: TasksHotspotOnboa
   }, [currentStep, isLastStep])
 
   return (
-    <div className="fixed inset-0 z-[9999] pointer-events-none">
-      {/* Backdrop з затемненням */}
-      <div 
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm pointer-events-auto"
-        onClick={handleSkip}
+    <div className="fixed inset-0 z-[9998] pointer-events-none">
+      {/* Spotlight - підсвітка елемента без затемнення */}
+      <div
+        className="absolute rounded-lg border-2 border-blue-500 pointer-events-none transition-all duration-300"
+        style={spotlightStyle}
       />
-
-      {/* Spotlight - підсвітка поточного елемента */}
-      {step.elementId && (
-        <div
-          className="absolute border-4 border-blue-500 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] pointer-events-none animate-pulse"
-          style={spotlightStyle}
-        />
-      )}
 
       {/* Tooltip з описом */}
       <div
         ref={tooltipRef}
-        className={`absolute bg-white rounded-xl shadow-2xl p-6 max-w-sm pointer-events-auto ${
-          !step.elementId ? "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" : ""
-        }`}
-        style={!step.elementId ? {} : tooltipStyle}
+        className="absolute bg-white rounded-xl shadow-2xl p-6 max-w-sm pointer-events-auto"
+        style={tooltipStyle}
       >
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3 flex-1">
@@ -215,7 +191,7 @@ export function TasksHotspotOnboarding({ onComplete, onSkip }: TasksHotspotOnboa
             </div>
             <div className="flex-1">
               <div className="text-xs font-medium text-blue-600 mb-1">
-                Крок {currentStep + 1} з {steps.length}
+                Step {currentStep + 1} of {steps.length}
               </div>
               <h3 className="text-lg font-bold text-gray-900">{step.title}</h3>
             </div>
@@ -230,10 +206,10 @@ export function TasksHotspotOnboarding({ onComplete, onSkip }: TasksHotspotOnboa
 
         <p className="text-sm text-gray-600 leading-relaxed mb-6">{step.description}</p>
 
-        {step.highlightNextTab && (
+        {step.id === "advanced-filters" && (
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-900">
-              💡 Next: We'll show you <strong>{step.highlightNextTabLabel}</strong> next
+              💡 <strong>Try it now:</strong> Click the "Filter" button to see AI-powered filtering and standard filtering options in action.
             </p>
           </div>
         )}
@@ -251,28 +227,29 @@ export function TasksHotspotOnboarding({ onComplete, onSkip }: TasksHotspotOnboa
         </div>
 
         {/* Кнопки навігації */}
-        <div className="flex items-center justify-between">
-          <button
-            onClick={handleSkip}
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            Пропустити
-          </button>
-
-          <div className="flex gap-2">
+        <div className={`flex items-center ${isLastStep ? "justify-end" : "justify-between"}`}>
+          {!isLastStep && (
+            <button
+              onClick={handleSkip}
+              className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              Skip tour
+            </button>
+          )}
+          <div className="flex items-center gap-3">
             {currentStep > 0 && (
               <button
                 onClick={handlePrev}
-                className="flex items-center gap-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors text-sm"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
               >
-                Назад
+                Back
               </button>
             )}
             <button
               onClick={handleNext}
-              className="flex items-center gap-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors text-sm"
+              className="px-4 py-2 text-sm font-medium text-white bg-[#4F7CFF] hover:bg-[#4F7CFF]/90 rounded-lg transition-colors flex items-center gap-2"
             >
-              {isLastStep ? "Завершити" : "Далі"}
+              {isLastStep ? "Finish" : "Next"}
               {!isLastStep && <ArrowRight className="w-4 h-4" />}
             </button>
           </div>

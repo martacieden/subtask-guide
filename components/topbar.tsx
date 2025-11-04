@@ -62,7 +62,7 @@ export function Topbar() {
 
       {/* Right side: Actions */}
       <div className="flex items-center gap-4" id="actionButtons">
-        <a id="user-current-gen-switch" href="#" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+        <a id="user-current-gen-switch" href="#" className="text-sm text-gray-600 hover:text-gray-900 transition-colors border border-border rounded-lg px-4 py-2">
           Go to Way2B1
         </a>
 
