@@ -23,7 +23,7 @@ export function createOnboardingTask() {
   const userEmail = localStorage.getItem("way2b1_user_email") || ""
   const assignee = firstName && lastName ? `${firstName} ${lastName}` : userEmail || "Current User"
 
-  // Create onboarding task with checklist
+  // Create onboarding task with subtasks
   const onboardingTask = {
     id: `onboarding-${Date.now()}`,
     taskId: `ONBOARD-${Date.now().toString().slice(-4)}`,
@@ -36,36 +36,54 @@ export function createOnboardingTask() {
     category: "Onboarding",
     project: "Onboarding",
     amount: "—",
-    checklistItems: [
+    subtasks: [
       {
-        id: "checklist-1",
-        text: "Review your homepage—this is where your assigned items appear",
-        completed: false,
+        id: "subtask-1",
+        name: "Review your homepage—this is where your assigned items appear",
+        status: "Created",
+        assignees: [],
+        priority: "Normal",
+        dueDate: undefined,
       },
       {
-        id: "checklist-2",
-        text: "Check the left navigation to see Decisions, Projects, and other modules",
-        completed: false,
+        id: "subtask-2",
+        name: "Check the left navigation to see Decisions, Projects, and other modules",
+        status: "Created",
+        assignees: [],
+        priority: "Normal",
+        dueDate: undefined,
       },
       {
-        id: "checklist-3",
-        text: "Leave a comment on this task (By the way, you can @mentioning someone)",
-        completed: false,
+        id: "subtask-3",
+        name: "Leave a comment on this task (By the way, you can @mentioning someone)",
+        status: "Created",
+        assignees: [],
+        priority: "Normal",
+        dueDate: undefined,
       },
       {
-        id: "checklist-4",
-        text: "Try changing this task's status using the dropdown",
-        completed: false,
+        id: "subtask-4",
+        name: "Try changing this task's status using the dropdown",
+        status: "Created",
+        assignees: [],
+        priority: "Normal",
+        dueDate: undefined,
       },
       {
-        id: "checklist-5",
-        text: "Explore one module that interests you (Decisions, Projects, etc.)",
-        completed: false,
+        id: "subtask-5",
+        name: "Explore one module that interests you (Decisions, Projects, etc.)",
+        status: "Created",
+        assignees: [],
+        priority: "Normal",
+        dueDate: undefined,
       },
       {
-        id: "checklist-6",
-        text: "Mark this task complete when you're ready",
-        completed: false,
+        id: "subtask-6",
+        name: "Mark this task complete when you're ready",
+        status: "Created",
+        assignees: [],
+        priority: "Normal",
+        dueDate: undefined,
       },
     ],
   }

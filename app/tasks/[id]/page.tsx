@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Sidebar } from "@/components/sidebar"
 import { Button } from "@/components/ui/button"
-import { CheckCircle2, Circle, ArrowLeft, Share2, MoreVertical, Sparkles, X, Send, Search, MessageSquare, Equal, ChevronDown, RefreshCw, List } from "lucide-react"
+import { CheckCircle2, Circle, ArrowLeft, Share2, MoreVertical, Sparkles, X, Send, Search, MessageSquare, Equal, ChevronDown, RefreshCw, List, Plus, Info } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { OnboardingCompletionCelebration } from "@/components/onboarding/OnboardingCompletionCelebration"
 import { InteractiveChecklistHint } from "@/components/onboarding/InteractiveChecklistHint"
@@ -14,6 +14,15 @@ interface ChecklistItem {
   id: string
   text: string
   completed: boolean
+}
+
+interface Subtask {
+  id: string
+  name: string
+  status: string
+  assignees?: string[]
+  priority: string
+  dueDate?: string
 }
 
 interface Task {
@@ -31,6 +40,7 @@ interface Task {
   project?: string
   amount?: string
   checklistItems?: ChecklistItem[]
+  subtasks?: Subtask[]
   createdAt?: string
   lastModified?: string
 }
@@ -42,6 +52,7 @@ export default function TaskDetailPage() {
 
   const [task, setTask] = useState<Task | null>(null)
   const [localChecklist, setLocalChecklist] = useState<ChecklistItem[]>([])
+  const [localSubtasks, setLocalSubtasks] = useState<Subtask[]>([])
   const [activeSection, setActiveSection] = useState<string>("summary")
   const [showSummary, setShowSummary] = useState(true)
   const [showCelebration, setShowCelebration] = useState(false)
@@ -49,12 +60,12 @@ export default function TaskDetailPage() {
   const [comments, setComments] = useState<Array<{ id: string; text: string; author: string; timestamp: string }>>([])
   const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: "" })
   
-  // Calculate progress
-  const checklistProgress = localChecklist.length > 0
-    ? Math.round((localChecklist.filter(item => item.completed).length / localChecklist.length) * 100)
+  // Calculate progress for subtasks (based on status "Done")
+  const subtaskProgress = localSubtasks.length > 0
+    ? Math.round((localSubtasks.filter(item => item.status === "Done").length / localSubtasks.length) * 100)
     : 0
-  const completedCount = localChecklist.filter(item => item.completed).length
-  const totalCount = localChecklist.length
+  const completedSubtasksCount = localSubtasks.filter(item => item.status === "Done").length
+  const totalSubtasksCount = localSubtasks.length
   
 
   useEffect(() => {
@@ -66,10 +77,39 @@ export default function TaskDetailPage() {
 
     if (foundTask) {
       setTask(foundTask)
+      
+      // Завантажуємо subtasks (якщо є)
+      if (foundTask.subtasks && foundTask.subtasks.length > 0) {
+        setLocalSubtasks(foundTask.subtasks)
+      } else if (foundTask.checklistItems && foundTask.checklistItems.length > 0) {
+        // Конвертуємо checklistItems в subtasks для зворотної сумісності
+        const convertedSubtasks: Subtask[] = foundTask.checklistItems.map((item, index) => ({
+          id: item.id,
+          name: item.text,
+          status: item.completed ? "Done" : "Created",
+          assignees: [],
+          priority: "Normal",
+          dueDate: undefined,
+        }))
+        setLocalSubtasks(convertedSubtasks)
+        
+        // Оновлюємо task з новими subtasks
+        const tasks = JSON.parse(localStorage.getItem("way2b1_tasks") || "[]")
+        const updatedTasks = tasks.map((t: any) => {
+          if (t.id === foundTask.id) {
+            return { ...t, subtasks: convertedSubtasks }
+          }
+          return t
+        })
+        localStorage.setItem("way2b1_tasks", JSON.stringify(updatedTasks))
+      } else {
+        setLocalSubtasks([])
+      }
+      
+      // Зберігаємо checklistItems для зворотної сумісності
       if (foundTask.checklistItems && foundTask.checklistItems.length > 0) {
         setLocalChecklist(foundTask.checklistItems)
       } else {
-        // Якщо checklistItems відсутні, встановлюємо порожній масив
         setLocalChecklist([])
       }
     } else {
@@ -78,19 +118,19 @@ export default function TaskDetailPage() {
     }
   }, [taskId, router])
 
-  // Плавний скрол до чекліста для onboarding task
+  // Плавний скрол до сабтасків для onboarding task
   useEffect(() => {
     if (!task || typeof window === "undefined") return
 
     const isOnboardingTask = task.name === "Welcome to NextGen — Your Quick Start Guide"
     
-    if (isOnboardingTask) {
+    if (isOnboardingTask && localSubtasks.length > 0) {
       // Чекаємо трохи, щоб сторінка встигла відрендеритися
       const scrollTimer = setTimeout(() => {
-        const descriptionSection = document.getElementById("description")
-        if (descriptionSection) {
-          setActiveSection("description")
-          descriptionSection.scrollIntoView({ 
+        const subtasksSection = document.getElementById("subtasks")
+        if (subtasksSection) {
+          setActiveSection("subtasks")
+          subtasksSection.scrollIntoView({ 
             behavior: "smooth", 
             block: "start" 
           })
@@ -99,7 +139,7 @@ export default function TaskDetailPage() {
 
       return () => clearTimeout(scrollTimer)
     }
-  }, [task])
+  }, [task, localSubtasks])
 
   const handleChecklistToggle = (itemId: string, completed: boolean) => {
     if (!task) return
@@ -137,6 +177,78 @@ export default function TaskDetailPage() {
         setShowCelebration(true)
       }, 500)
     }
+  }
+
+  const handleSubtaskUpdate = (subtaskId: string, updates: Partial<Subtask>) => {
+    if (!task) return
+
+    const updated = localSubtasks.map((subtask) =>
+      subtask.id === subtaskId ? { ...subtask, ...updates } : subtask
+    )
+    setLocalSubtasks(updated)
+
+    // Оновлюємо localStorage
+    const tasks = JSON.parse(localStorage.getItem("way2b1_tasks") || "[]")
+    const updatedTasks = tasks.map((t: any) => {
+      if (t.id === task.id) {
+        return {
+          ...t,
+          subtasks: updated,
+        }
+      }
+      return t
+    })
+    localStorage.setItem("way2b1_tasks", JSON.stringify(updatedTasks))
+    
+    // Оновлюємо локальний стан
+    setTask({ ...task, subtasks: updated })
+    
+    // Dispatch event to notify components
+    window.dispatchEvent(new CustomEvent("taskUpdated"))
+    
+    // Check if onboarding is completed (all subtasks done)
+    const doneCount = updated.filter(item => item.status === "Done").length
+    const isOnboardingTask = task.name === "Welcome to NextGen — Your Quick Start Guide"
+    if (isOnboardingTask && doneCount === updated.length && updated.length > 0) {
+      setTimeout(() => {
+        setShowCelebration(true)
+      }, 500)
+    }
+  }
+
+  const handleAddSubtask = () => {
+    if (!task) return
+
+    const newSubtask: Subtask = {
+      id: `subtask-${Date.now()}`,
+      name: "New subtask",
+      status: "Created",
+      assignees: [],
+      priority: "Normal",
+      dueDate: undefined,
+    }
+
+    const updated = [...localSubtasks, newSubtask]
+    setLocalSubtasks(updated)
+
+    // Оновлюємо localStorage
+    const tasks = JSON.parse(localStorage.getItem("way2b1_tasks") || "[]")
+    const updatedTasks = tasks.map((t: any) => {
+      if (t.id === task.id) {
+        return {
+          ...t,
+          subtasks: updated,
+        }
+      }
+      return t
+    })
+    localStorage.setItem("way2b1_tasks", JSON.stringify(updatedTasks))
+    
+    // Оновлюємо локальний стан
+    setTask({ ...task, subtasks: updated })
+    
+    // Dispatch event to notify components
+    window.dispatchEvent(new CustomEvent("taskUpdated"))
   }
 
   const scrollToSection = (sectionId: string) => {
@@ -263,6 +375,16 @@ export default function TaskDetailPage() {
                   >
                     Description
                   </button>
+                  <button
+                    onClick={() => scrollToSection("subtasks")}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      activeSection === "subtasks"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    Subtasks
+                  </button>
                 </nav>
               </div>
 
@@ -332,19 +454,19 @@ export default function TaskDetailPage() {
                               
                               // Якщо це onboarding task і статус змінився
                               if (task.name === "Welcome to NextGen — Your Quick Start Guide" && newStatus !== task.status) {
-                                // Відмічаємо checklist-4 (Change status) якщо ще не відмічений
-                                const statusChecklistItem = localChecklist.find(item => item.id === "checklist-4")
-                                if (statusChecklistItem && !statusChecklistItem.completed) {
-                                  handleChecklistToggle("checklist-4", true)
+                                // Відмічаємо subtask-4 (Change status) якщо ще не відмічений
+                                const statusSubtask = localSubtasks.find(item => item.id === "subtask-4")
+                                if (statusSubtask && statusSubtask.status !== "Done") {
+                                  handleSubtaskUpdate("subtask-4", { status: "Done" })
                                   // Показуємо toast
                                   setToast({ show: true, message: "Great! You've completed: Change task status" })
                                 }
                                 
-                                // Якщо статус змінено на "Done", автоматично відмічаємо checklist-6
+                                // Якщо статус змінено на "Done", автоматично відмічаємо subtask-6
                                 if (newStatus === "Done") {
-                                  const completeChecklistItem = localChecklist.find(item => item.id === "checklist-6")
-                                  if (completeChecklistItem && !completeChecklistItem.completed) {
-                                    handleChecklistToggle("checklist-6", true)
+                                  const completeSubtask = localSubtasks.find(item => item.id === "subtask-6")
+                                  if (completeSubtask && completeSubtask.status !== "Done") {
+                                    handleSubtaskUpdate("subtask-6", { status: "Done" })
                                     // Показуємо toast
                                     setTimeout(() => {
                                       setToast({ show: true, message: "Great! You've completed: Mark task as complete" })
@@ -421,131 +543,159 @@ export default function TaskDetailPage() {
                   <section id="description" className="scroll-mt-6">
                     <div className="mb-4 flex items-center justify-between w-full">
                       <h2 className="text-lg font-semibold text-foreground">Description</h2>
-                      {localChecklist.length > 0 && (
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-primary transition-all duration-500 ease-out"
-                                style={{ width: `${checklistProgress}%` }}
-                              />
-                            </div>
-                            <span className="text-sm font-medium text-muted-foreground">
-                              {completedCount}/{totalCount} completed
-                            </span>
-                          </div>
-                        </div>
-                      )}
                     </div>
                     <div className="rounded-md hover:bg-secondary/30 max-w-[696px] border border-border p-4 min-h-[112px]">
                       <div className="prose prose-sm max-w-full">
-                        <h2 className="text-2xl font-bold text-foreground my-3">👋 Welcome!</h2>
-                        <h3 className="text-base font-semibold text-foreground my-3">
-                          This task will help you get oriented.
-                        </h3>
-                        <p className="my-3">
-                          <strong className="text-foreground">Complete these checkboxes as you explore:</strong>
-                        </p>
-                        <ul className="pl-0 list-none my-3" data-type="taskList">
-                          {localChecklist && localChecklist.length > 0 ? (
-                            localChecklist.map((item) => (
-                              <li 
-                                key={item.id} 
-                                className={`flex items-center m-0 mb-2 transition-smooth relative ${
-                                  item.completed ? "checklist-item-complete" : ""
-                                }`}
-                              >
-                                <label className="flex items-center mr-2 cursor-pointer flex-shrink-0">
-                                  <input
-                                    type="checkbox"
-                                    checked={item.completed || false}
-                                    onChange={() => handleChecklistToggle(item.id, !item.completed)}
-                                    className="cursor-pointer w-4 h-4 transition-smooth"
-                                  />
-                                </label>
-                                <div className="flex-1 flex items-center">
-                                  <p className={`m-0 text-sm transition-smooth ${
-                                    item.completed
-                                      ? "line-through text-muted-foreground"
-                                      : "text-foreground"
-                                  }`}>
-                                    {item.text}
-                                  </p>
-                                  {!item.completed && (
-                                    <InteractiveChecklistHint
-                                      checklistId={item.id}
-                                      isCompleted={item.completed}
-                                      onShow={() => {
-                                        // Додаткова логіка при показі підказки
-                                      }}
-                                      onChecklistToggle={handleChecklistToggle}
-                                    />
-                                  )}
-                                </div>
-                              </li>
-                            ))
-                          ) : (
-                            // Fallback checklist якщо checklistItems відсутні
-                            <>
-                              <li className="flex items-center m-0 mb-2">
-                                <label className="flex items-center mr-2 cursor-pointer flex-shrink-0">
-                                  <input type="checkbox" className="cursor-pointer w-4 h-4" />
-                                </label>
-                                <div className="flex-1">
-                                  <p className="m-0 text-sm text-foreground">Review your homepage—this is where your assigned items appear</p>
-                                </div>
-                              </li>
-                              <li className="flex items-center m-0 mb-2">
-                                <label className="flex items-center mr-2 cursor-pointer flex-shrink-0">
-                                  <input type="checkbox" className="cursor-pointer w-4 h-4" />
-                                </label>
-                                <div className="flex-1">
-                                  <p className="m-0 text-sm text-foreground">Check the left navigation to see Decisions, Projects, and other modules</p>
-                                </div>
-                              </li>
-                              <li className="flex items-center m-0 mb-2">
-                                <label className="flex items-center mr-2 cursor-pointer flex-shrink-0">
-                                  <input type="checkbox" className="cursor-pointer w-4 h-4" />
-                                </label>
-                                <div className="flex-1">
-                                  <p className="m-0 text-sm text-foreground">Leave a comment on this task (By the way, you can @mentioning someone)</p>
-                                </div>
-                              </li>
-                              <li className="flex items-center m-0 mb-2">
-                                <label className="flex items-center mr-2 cursor-pointer flex-shrink-0">
-                                  <input type="checkbox" className="cursor-pointer w-4 h-4" />
-                                </label>
-                                <div className="flex-1">
-                                  <p className="m-0 text-sm text-foreground">Try changing this task's status using the dropdown</p>
-                                </div>
-                              </li>
-                              <li className="flex items-center m-0 mb-2">
-                                <label className="flex items-center mr-2 cursor-pointer flex-shrink-0">
-                                  <input type="checkbox" className="cursor-pointer w-4 h-4" />
-                                </label>
-                                <div className="flex-1">
-                                  <p className="m-0 text-sm text-foreground">Explore one module that interests you (Decisions, Projects, etc.)</p>
-                                </div>
-                              </li>
-                              <li className="flex items-center m-0 mb-2">
-                                <label className="flex items-center mr-2 cursor-pointer flex-shrink-0">
-                                  <input type="checkbox" className="cursor-pointer w-4 h-4" />
-                                </label>
-                                <div className="flex-1">
-                                  <p className="m-0 text-sm text-foreground">Mark this task complete when you're ready</p>
-                                </div>
-                              </li>
-                            </>
-                          )}
-                        </ul>
-                        <p className="my-3 text-sm text-foreground">
-                          Need help? Click the [?] icon or visit our{" "}
+                        <h2 className="text-2xl font-bold text-foreground my-3">Welcome!</h2>
+                        <p className="my-3 text-foreground">
+                          We've created a few quick tasks to help you get started. Complete them in any order—they'll take about 5 minutes total. Mark each subtask complete as you go. Need help? Click the [?] icon or visit our{" "}
                           <a href="#" className="text-primary hover:underline">
                             Help Center
                           </a>
                         </p>
                       </div>
                     </div>
+                  </section>
+
+                  {/* Subtasks Section */}
+                  <section id="subtasks" className="scroll-mt-6">
+                    <div className="mb-4 flex items-center justify-between w-full">
+                      <h2 className="text-lg font-semibold text-foreground">Subtasks</h2>
+                      <div className="flex items-center gap-3">
+                        {localSubtasks.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary transition-all duration-500 ease-out"
+                                style={{ width: `${subtaskProgress}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-medium text-muted-foreground">
+                              {completedSubtasksCount}/{totalSubtasksCount}
+                            </span>
+                            <Info className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleAddSubtask}
+                          className="gap-2"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add subtask
+                        </Button>
+                      </div>
+                    </div>
+
+                    {localSubtasks.length > 0 ? (
+                      <div className="border border-border rounded-lg overflow-hidden">
+                        <table className="w-full">
+                          <thead className="bg-secondary/30 border-b border-border">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                Name
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                Status
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                Assignees
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                Priority
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                Due Date
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-card divide-y divide-border">
+                            {localSubtasks.map((subtask) => {
+                              const isDone = subtask.status === "Done"
+                              return (
+                                <tr 
+                                  key={subtask.id} 
+                                  onClick={() => {
+                                    handleSubtaskUpdate(subtask.id, {
+                                      status: isDone ? "Created" : "Done",
+                                    })
+                                  }}
+                                  className={`hover:bg-secondary/30 transition-colors cursor-pointer ${
+                                    isDone ? "opacity-60" : ""
+                                  }`}
+                                >
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <Checkbox
+                                        checked={isDone}
+                                        onCheckedChange={(checked) => {
+                                          handleSubtaskUpdate(subtask.id, {
+                                            status: checked ? "Done" : "Created",
+                                          })
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                      <input
+                                        type="text"
+                                        value={subtask.name}
+                                        onChange={(e) => {
+                                          handleSubtaskUpdate(subtask.id, { name: e.target.value })
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className={`flex-1 text-sm bg-transparent border-none focus:outline-none focus:ring-0 p-0 ${
+                                          isDone 
+                                            ? "line-through text-muted-foreground" 
+                                            : "text-foreground"
+                                        }`}
+                                        onBlur={(e) => {
+                                          if (!e.target.value.trim()) {
+                                            handleSubtaskUpdate(subtask.id, { name: "New subtask" })
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className={`text-xs font-medium px-2 py-1 rounded-md ${
+                                      isDone
+                                        ? "bg-green-100 text-green-700"
+                                        : "bg-gray-100 text-gray-700"
+                                    }`}>
+                                      {isDone ? "Done" : "To Do"}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className="text-sm text-muted-foreground">
+                                      {subtask.assignees && subtask.assignees.length > 0
+                                        ? subtask.assignees.join(", ")
+                                        : "—"}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <Equal className="w-4 h-4 text-primary" />
+                                      <span className="text-sm text-foreground">{subtask.priority}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className="text-sm text-muted-foreground">
+                                      {subtask.dueDate || "—"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="border border-border rounded-lg p-12 text-center">
+                        <p className="text-sm text-muted-foreground mb-4">
+                          No subtasks yet. Click "Add subtask" to create one.
+                        </p>
+                      </div>
+                    )}
                   </section>
                 </div>
               </div>
@@ -646,13 +796,24 @@ export default function TaskDetailPage() {
                         // Перевіряємо, чи є @ в коментарі
                         const hasMention = commentText.includes("@")
                         
-                        // Якщо це onboarding task і є @, автоматично відмічаємо чекбокс
+                        // Якщо це onboarding task і є @, автоматично відмічаємо сабтаск
+                        // Це допомагає користувачу зрозуміти, що він виконує завдання правильно
                         if (task && task.name === "Welcome to NextGen — Your Quick Start Guide" && hasMention) {
-                          const commentChecklistItem = localChecklist.find(item => item.id === "checklist-3")
-                          if (commentChecklistItem && !commentChecklistItem.completed) {
-                            handleChecklistToggle("checklist-3", true)
-                            // Показуємо toast
-                            setToast({ show: true, message: "Great! You've completed: Leave a comment with @mention" })
+                          const commentSubtask = localSubtasks.find(item => item.id === "subtask-3")
+                          if (commentSubtask && commentSubtask.status !== "Done") {
+                            handleSubtaskUpdate("subtask-3", { status: "Done" })
+                            // Показуємо toast з підтвердженням
+                            setToast({ 
+                              show: true, 
+                              message: "✅ Subtask completed! You've learned how to use @mentions in comments." 
+                            })
+                          }
+                        } else if (task && task.name === "Welcome to NextGen — Your Quick Start Guide" && !hasMention) {
+                          // Якщо коментар без @, підказуємо користувачу
+                          const commentSubtask = localSubtasks.find(item => item.id === "subtask-3")
+                          if (commentSubtask && commentSubtask.status !== "Done") {
+                            // Не відмічаємо автоматично, але можемо показати підказку
+                            // (залишаємо користувачу можливість відмітити вручну)
                           }
                         }
                         
