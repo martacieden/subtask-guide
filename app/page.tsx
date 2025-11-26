@@ -330,12 +330,18 @@ export default function Home() {
     // Create onboarding task for first-time users
     createOnboardingTask()
     
-    setShowLogin(false)
     // Після заповнення профілю - показуємо NextGenWelcome одразу на Home Page
     // Встановлюємо прапорець, що треба показати NextGenWelcome
     localStorage.setItem("way2b1_show_next_gen_welcome", "true")
-    // Показуємо NextGenWelcome одразу
-    setShowNextGenWelcome(true)
+    
+    // Закриваємо форму логіну
+    setShowLogin(false)
+    
+    // Показуємо NextGenWelcome одразу після закриття форми
+    // Використовуємо setTimeout, щоб дати час формі закритися
+    setTimeout(() => {
+      setShowNextGenWelcome(true)
+    }, 100)
   }
 
   const handleNextGenWelcomeComplete = () => {
