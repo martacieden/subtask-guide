@@ -396,22 +396,30 @@ export default function TaskDetailPage() {
                       )}
                     </nav>
                   </div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <div className="flex items-center gap-3 mb-2 min-w-0">
+                    <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
                       <List className="w-5 h-5 text-primary" />
                     </div>
-                    <span className="text-sm font-medium text-muted-foreground">{displayId}</span>
-                    <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-full">
+                    <span className="text-sm font-medium text-muted-foreground truncate max-w-[200px]" title={displayId}>
+                      {displayId}
+                    </span>
+                    <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-full flex-shrink-0">
                       {task.status}
                     </span>
-                    <span className="text-sm text-muted-foreground">Created on {createdDate}</span>
+                    <span className="text-sm text-muted-foreground truncate max-w-[300px]" title={`Created on ${createdDate}`}>
+                      Created on {createdDate}
+                    </span>
                   </div>
-                  <h1 className="text-2xl font-bold text-foreground mb-1">{taskName}</h1>
+                  <h1 className="text-2xl font-bold text-foreground mb-1 truncate max-w-4xl" title={taskName}>
+                    {taskName}
+                  </h1>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right mr-4">
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <div className="text-right mr-4 min-w-0">
                     <div className="flex items-center gap-2 justify-end">
-                      <p className="text-sm text-muted-foreground">Last modified by • {lastModified}</p>
+                      <p className="text-sm text-muted-foreground truncate max-w-[250px]" title={`Last modified by • ${lastModified}`}>
+                        Last modified by • {lastModified}
+                      </p>
                       {/* Аватари співробітників - можна додати пізніше */}
                       {task.assignee && (
                         <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-700">
