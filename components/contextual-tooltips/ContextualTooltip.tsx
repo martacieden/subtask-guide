@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { createPortal } from "react-dom"
 import { X } from "lucide-react"
 import { useFirstTime } from "@/hooks/useFirstTime"
 
@@ -10,6 +11,7 @@ interface ContextualTooltipProps {
   message: string
   position?: "top" | "bottom" | "left" | "right"
   delay?: number
+  onDismiss?: () => void
 }
 
 export function ContextualTooltip({ 
@@ -17,15 +19,110 @@ export function ContextualTooltip({
   targetElementId, 
   message, 
   position = "bottom",
-  delay = 1000 
+  delay = 1000,
+  onDismiss
 }: ContextualTooltipProps) {
   const [isFirstTime, markAsSeen] = useFirstTime(`tooltip_${tooltipKey}_${targetElementId}`)
   const [isVisible, setIsVisible] = useState(false)
   const [tooltipPosition, setTooltipPosition] = useState<{ top: number; left: number } | null>(null)
+  const [mounted, setMounted] = useState(false)
   const tooltipRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!isFirstTime || typeof window === "undefined") return
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isFirstTime || typeof window === "undefined" || !mounted) return
+
+    const calculatePosition = () => {
+      const element = document.getElementById(targetElementId)
+      if (!element) {
+        return null
+      }
+
+      const rect = element.getBoundingClientRect()
+      const margin = 12
+
+      // Спочатку встановлюємо базову позицію без урахування розміру тултіпа
+      let top = 0
+      let left = 0
+
+      switch (position) {
+        case "top":
+          top = rect.top - margin
+          left = rect.left + rect.width / 2
+          break
+        case "bottom":
+          top = rect.bottom + margin
+          left = rect.left + rect.width / 2
+          break
+        case "left":
+          top = rect.top + rect.height / 2
+          left = rect.left - margin
+          break
+        case "right":
+          top = rect.top + rect.height / 2
+          left = rect.right + margin
+          break
+      }
+
+      return { top, left, rect }
+    }
+
+    const adjustPosition = () => {
+      if (!tooltipRef.current) {
+        return
+      }
+
+      const initialPos = calculatePosition()
+      if (!initialPos) {
+        return
+      }
+
+      const tooltipRect = tooltipRef.current.getBoundingClientRect()
+      const tooltipWidth = tooltipRect.width || 280
+      const tooltipHeight = tooltipRect.height || 80
+      const margin = 12
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+
+      let { top, left } = initialPos
+
+      // Корекція позиції в залежності від напрямку
+      switch (position) {
+        case "top":
+          left = left - tooltipWidth / 2
+          top = top - tooltipHeight
+          break
+        case "bottom":
+          left = left - tooltipWidth / 2
+          break
+        case "left":
+          left = left - tooltipWidth
+          top = top - tooltipHeight / 2
+          break
+        case "right":
+          top = top - tooltipHeight / 2
+          break
+      }
+
+      // Перевірка меж viewport
+      if (left < margin) {
+        left = margin
+      }
+      if (left + tooltipWidth > viewportWidth - margin) {
+        left = viewportWidth - tooltipWidth - margin
+      }
+      if (top < margin) {
+        top = margin
+      }
+      if (top + tooltipHeight > viewportHeight - margin) {
+        top = viewportHeight - tooltipHeight - margin
+      }
+
+      setTooltipPosition({ top, left })
+    }
 
     const showTooltip = () => {
       const element = document.getElementById(targetElementId)
@@ -34,82 +131,74 @@ export function ContextualTooltip({
         return
       }
 
-      const rect = element.getBoundingClientRect()
-      const scrollY = window.scrollY
-      const scrollX = window.scrollX
-      
-      if (!tooltipRef.current) {
-        setTimeout(showTooltip, 50)
-        return
+      // Спочатку встановлюємо позицію приблизно
+      const initialPos = calculatePosition()
+      if (initialPos) {
+        setTooltipPosition({ top: initialPos.top, left: initialPos.left })
+        setIsVisible(true)
+        
+        // Після рендерингу корегуємо позицію
+        setTimeout(() => {
+          adjustPosition()
+        }, 0)
       }
-
-      const tooltipWidth = tooltipRef.current.offsetWidth || 280
-      const tooltipHeight = tooltipRef.current.offsetHeight || 80
-      const margin = 12
-
-      let top = 0
-      let left = 0
-
-      switch (position) {
-        case "top":
-          top = rect.top + scrollY - tooltipHeight - margin
-          left = rect.left + scrollX + rect.width / 2 - tooltipWidth / 2
-          break
-        case "bottom":
-          top = rect.bottom + scrollY + margin
-          left = rect.left + scrollX + rect.width / 2 - tooltipWidth / 2
-          break
-        case "left":
-          top = rect.top + scrollY + rect.height / 2 - tooltipHeight / 2
-          left = rect.left + scrollX - tooltipWidth - margin
-          break
-        case "right":
-          top = rect.top + scrollY + rect.height / 2 - tooltipHeight / 2
-          left = rect.right + scrollX + margin
-          break
-      }
-
-      // Ensure tooltip stays within viewport
-      const viewportWidth = window.innerWidth
-      const viewportHeight = window.innerHeight
-
-      if (left < margin) left = margin
-      if (left + tooltipWidth > viewportWidth - margin) left = viewportWidth - tooltipWidth - margin
-      if (top < margin) top = margin
-      if (top + tooltipHeight > viewportHeight - margin) top = viewportHeight - tooltipHeight - margin
-
-      setTooltipPosition({ top, left })
-      setTimeout(() => setIsVisible(true), delay)
     }
 
-    const timeout = setTimeout(showTooltip, 300)
-    window.addEventListener("resize", showTooltip)
-    window.addEventListener("scroll", showTooltip)
+    const timeout = setTimeout(() => {
+      showTooltip()
+      setTimeout(() => {
+        adjustPosition()
+      }, delay)
+    }, 300)
+
+    const handleResize = () => {
+      if (isVisible) {
+        adjustPosition()
+      }
+    }
+
+    const handleScroll = () => {
+      if (isVisible) {
+        adjustPosition()
+      }
+    }
+
+    window.addEventListener("resize", handleResize)
+    window.addEventListener("scroll", handleScroll, true)
 
     return () => {
       clearTimeout(timeout)
-      window.removeEventListener("resize", showTooltip)
-      window.removeEventListener("scroll", showTooltip)
+      window.removeEventListener("resize", handleResize)
+      window.removeEventListener("scroll", handleScroll, true)
     }
-  }, [isFirstTime, targetElementId, position, delay])
+  }, [isFirstTime, targetElementId, position, delay, mounted, isVisible])
 
   const handleDismiss = () => {
     markAsSeen()
     setIsVisible(false)
+    if (onDismiss) {
+      onDismiss()
+    }
   }
 
-  if (!isFirstTime || !tooltipPosition || !isVisible) return null
+  if (!mounted || !isFirstTime || !tooltipPosition || !isVisible) return null
 
-  return (
+  const tooltipContent = (
     <div
       ref={tooltipRef}
-      className="fixed z-[9999] pointer-events-auto animate-in fade-in slide-in-from-bottom-2 duration-300"
+      className="fixed pointer-events-auto animate-in fade-in slide-in-from-bottom-2 duration-300"
       style={{
         top: `${tooltipPosition.top}px`,
         left: `${tooltipPosition.left}px`,
+        zIndex: 999999,
+        isolation: 'isolate',
+        position: 'fixed',
+        pointerEvents: 'auto',
+        willChange: 'transform',
+        transform: 'translateZ(0)',
       }}
     >
-      <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-3 max-w-xs min-w-[240px]">
+      <div className="bg-white rounded-lg shadow-2xl border border-gray-200 p-3 max-w-xs min-w-[240px] relative" style={{ zIndex: 999999 }}>
         <div className="flex items-start justify-between gap-2">
           <p className="text-xs text-gray-700 flex-1 leading-relaxed">{message}</p>
           <button
@@ -132,5 +221,12 @@ export function ContextualTooltip({
       </div>
     </div>
   )
+
+  // Перевіряємо, чи document.body існує перед створенням Portal
+  if (typeof document === "undefined" || !document.body) {
+    return null
+  }
+
+  return createPortal(tooltipContent, document.body)
 }
 

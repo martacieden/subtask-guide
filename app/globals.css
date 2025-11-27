@@ -448,3 +448,25 @@
     background-color: rgba(79, 124, 255, 0.1);
   }
 }
+
+/* Підсвітка елементів для онбордингу */
+.onboarding-highlight {
+  position: relative;
+  animation: onboarding-highlight 3s ease-in-out;
+  z-index: 1;
+}
+
+@keyframes onboarding-highlight {
+  0%, 100% {
+    outline: 3px solid #4F7CFF;
+    outline-offset: 4px;
+    box-shadow: 0 0 0 0 rgba(79, 124, 255, 0.4);
+    background-color: rgba(79, 124, 255, 0.1);
+  }
+  50% {
+    outline: 3px solid #2563eb;
+    outline-offset: 6px;
+    box-shadow: 0 0 0 8px rgba(79, 124, 255, 0.2);
+    background-color: rgba(79, 124, 255, 0.15);
+  }
+}

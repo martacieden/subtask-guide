@@ -4,10 +4,11 @@ import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Sidebar } from "@/components/sidebar"
 import { Button } from "@/components/ui/button"
-import { CheckCircle2, Circle, ArrowLeft, Share2, MoreVertical, Sparkles, X, Send, Search, MessageSquare, Equal, ChevronDown, RefreshCw, List, Plus, Info } from "lucide-react"
+import { CheckCircle2, Circle, ArrowLeft, Share2, MoreVertical, Sparkles, X, Send, Search, MessageSquare, Equal, ChevronDown, RefreshCw, List, Plus, Info, Eye, ArrowRight, Lightbulb, ExternalLink } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { OnboardingCompletionCelebration } from "@/components/onboarding/OnboardingCompletionCelebration"
 import { InteractiveChecklistHint } from "@/components/onboarding/InteractiveChecklistHint"
+import { SubtaskInteractiveGuide } from "@/components/onboarding/SubtaskInteractiveGuide"
 import { Toast } from "@/components/ui/toast"
 
 interface ChecklistItem {
@@ -31,6 +32,7 @@ interface Task {
   name: string
   title?: string
   description?: string
+  whatYouLearn?: string // Що ви навчитеся
   status: string
   priority: string
   assignee?: string
@@ -41,6 +43,11 @@ interface Task {
   amount?: string
   checklistItems?: ChecklistItem[]
   subtasks?: Subtask[]
+  parentTaskId?: string // ID батьківської таски для сабтасок
+  targetUrl?: string // URL для навігації
+  targetElementId?: string // ID елемента для підсвітки
+  scrollToSection?: string // Секція для скролу
+  showHowSteps?: string[] // Пошагові інструкції
   createdAt?: string
   lastModified?: string
 }
@@ -51,14 +58,17 @@ export default function TaskDetailPage() {
   const taskId = params?.id as string
 
   const [task, setTask] = useState<Task | null>(null)
+  const [parentTask, setParentTask] = useState<Task | null>(null)
+  const [isSubtask, setIsSubtask] = useState(false)
   const [localChecklist, setLocalChecklist] = useState<ChecklistItem[]>([])
   const [localSubtasks, setLocalSubtasks] = useState<Subtask[]>([])
   const [activeSection, setActiveSection] = useState<string>("summary")
-  const [showSummary, setShowSummary] = useState(true)
   const [showCelebration, setShowCelebration] = useState(false)
   const [commentText, setCommentText] = useState("")
   const [comments, setComments] = useState<Array<{ id: string; text: string; author: string; timestamp: string }>>([])
   const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: "" })
+  const [showHowTo, setShowHowTo] = useState(false)
+  const [highlightedElement, setHighlightedElement] = useState<string | null>(null)
   
   // Calculate progress for subtasks (based on status "Done")
   const subtaskProgress = localSubtasks.length > 0
@@ -76,32 +86,90 @@ export default function TaskDetailPage() {
     const foundTask = tasks.find((t: any) => t.id === taskId || t.taskId === taskId)
 
     if (foundTask) {
+      // Перевіряємо, чи це сабтаска (має parentTaskId)
+      if (foundTask.parentTaskId) {
+        // Це сабтаска, знаходимо батьківську таску
+        const parentTaskFound = tasks.find((t: any) => t.id === foundTask.parentTaskId)
+        if (parentTaskFound) {
+          setTask(foundTask)
+          setParentTask(parentTaskFound)
+          setIsSubtask(true)
+          // Сабтаски не мають сабтасок
+          setLocalSubtasks([])
+          setLocalChecklist([])
+          return
+        }
+      }
+
+      // Якщо не сабтаска, завантажуємо як звичайну таску
       setTask(foundTask)
+      setIsSubtask(false)
+      setParentTask(null)
       
-      // Завантажуємо subtasks (якщо є)
-      if (foundTask.subtasks && foundTask.subtasks.length > 0) {
-        setLocalSubtasks(foundTask.subtasks)
+      // Завантажуємо subtasks - шукаємо таски з parentTaskId = поточна таска
+      const subtasksAsTasks = tasks.filter((t: any) => t.parentTaskId === foundTask.id)
+      if (subtasksAsTasks.length > 0) {
+        // Конвертуємо таски в формат Subtask для відображення
+        const convertedSubtasks: Subtask[] = subtasksAsTasks.map((t: any) => ({
+          id: t.id,
+          name: t.name || t.title,
+          status: t.status || "To Do",
+          assignees: t.assignee ? [t.assignee] : [],
+          priority: t.priority || "Normal",
+          dueDate: t.dueDate,
+        }))
+        setLocalSubtasks(convertedSubtasks)
+      } else if (foundTask.subtasks && foundTask.subtasks.length > 0) {
+        // Зворотна сумісність: якщо є старі subtasks в масиві, конвертуємо їх в окремі таски
+        const tasks = JSON.parse(localStorage.getItem("way2b1_tasks") || "[]")
+        const newSubtaskTasks = foundTask.subtasks.map((st: any) => ({
+          id: st.id,
+          taskId: st.id,
+          name: st.name,
+          title: st.name,
+          status: st.status || "To Do",
+          priority: st.priority || "Normal",
+          assignee: st.assignees && st.assignees.length > 0 ? st.assignees[0] : undefined,
+          dueDate: st.dueDate,
+          parentTaskId: foundTask.id,
+          category: foundTask.category,
+          project: foundTask.project,
+          createdAt: st.createdAt || new Date().toISOString(),
+          lastModified: st.lastModified || new Date().toISOString(),
+        }))
+        
+        // Додаємо нові таски-сабтаски до localStorage
+        const updatedTasks = [...tasks, ...newSubtaskTasks].map((t: any) => {
+          if (t.id === foundTask.id) {
+            // Видаляємо старий масив subtasks
+            const { subtasks, ...rest } = t
+            return rest
+          }
+          return t
+        })
+        localStorage.setItem("way2b1_tasks", JSON.stringify(updatedTasks))
+        
+        // Оновлюємо локальний стан
+        const convertedSubtasks: Subtask[] = newSubtaskTasks.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          status: t.status,
+          assignees: t.assignee ? [t.assignee] : [],
+          priority: t.priority,
+          dueDate: t.dueDate,
+        }))
+        setLocalSubtasks(convertedSubtasks)
       } else if (foundTask.checklistItems && foundTask.checklistItems.length > 0) {
         // Конвертуємо checklistItems в subtasks для зворотної сумісності
-        const convertedSubtasks: Subtask[] = foundTask.checklistItems.map((item, index) => ({
+        const convertedSubtasks: Subtask[] = foundTask.checklistItems.map((item: ChecklistItem, index: number) => ({
           id: item.id,
           name: item.text,
-          status: item.completed ? "Done" : "Created",
+          status: item.completed ? "Done" : "To Do",
           assignees: [],
           priority: "Normal",
           dueDate: undefined,
         }))
         setLocalSubtasks(convertedSubtasks)
-        
-        // Оновлюємо task з новими subtasks
-        const tasks = JSON.parse(localStorage.getItem("way2b1_tasks") || "[]")
-        const updatedTasks = tasks.map((t: any) => {
-          if (t.id === foundTask.id) {
-            return { ...t, subtasks: convertedSubtasks }
-          }
-          return t
-        })
-        localStorage.setItem("way2b1_tasks", JSON.stringify(updatedTasks))
       } else {
         setLocalSubtasks([])
       }
@@ -182,18 +250,19 @@ export default function TaskDetailPage() {
   const handleSubtaskUpdate = (subtaskId: string, updates: Partial<Subtask>) => {
     if (!task) return
 
-    const updated = localSubtasks.map((subtask) =>
-      subtask.id === subtaskId ? { ...subtask, ...updates } : subtask
-    )
-    setLocalSubtasks(updated)
-
-    // Оновлюємо localStorage
+    // Оновлюємо таску-сабтаску в localStorage
     const tasks = JSON.parse(localStorage.getItem("way2b1_tasks") || "[]")
     const updatedTasks = tasks.map((t: any) => {
-      if (t.id === task.id) {
+      if (t.id === subtaskId && t.parentTaskId === task.id) {
+        // Оновлюємо таску-сабтаску
         return {
           ...t,
-          subtasks: updated,
+          name: updates.name !== undefined ? updates.name : t.name,
+          status: updates.status !== undefined ? updates.status : t.status,
+          assignee: updates.assignees && updates.assignees.length > 0 ? updates.assignees[0] : t.assignee,
+          priority: updates.priority !== undefined ? updates.priority : t.priority,
+          dueDate: updates.dueDate !== undefined ? updates.dueDate : t.dueDate,
+          lastModified: new Date().toISOString(),
         }
       }
       return t
@@ -201,7 +270,10 @@ export default function TaskDetailPage() {
     localStorage.setItem("way2b1_tasks", JSON.stringify(updatedTasks))
     
     // Оновлюємо локальний стан
-    setTask({ ...task, subtasks: updated })
+    const updated = localSubtasks.map((subtask) =>
+      subtask.id === subtaskId ? { ...subtask, ...updates } : subtask
+    )
+    setLocalSubtasks(updated)
     
     // Dispatch event to notify components
     window.dispatchEvent(new CustomEvent("taskUpdated"))
@@ -219,33 +291,38 @@ export default function TaskDetailPage() {
   const handleAddSubtask = () => {
     if (!task) return
 
-    const newSubtask: Subtask = {
-      id: `subtask-${Date.now()}`,
+    // Створюємо нову таску-сабтаску
+    const newSubtaskId = `subtask-${Date.now()}`
+    const newSubtaskTask: Task = {
+      id: newSubtaskId,
+      taskId: newSubtaskId,
       name: "New subtask",
-      status: "Created",
-      assignees: [],
+      title: "New subtask",
+      status: "To Do",
       priority: "Normal",
-      dueDate: undefined,
+      parentTaskId: task.id,
+      category: task.category,
+      project: task.project,
+      assignee: task.assignee,
+      createdAt: new Date().toISOString(),
+      lastModified: new Date().toISOString(),
     }
 
-    const updated = [...localSubtasks, newSubtask]
-    setLocalSubtasks(updated)
-
-    // Оновлюємо localStorage
+    // Додаємо нову таску до localStorage
     const tasks = JSON.parse(localStorage.getItem("way2b1_tasks") || "[]")
-    const updatedTasks = tasks.map((t: any) => {
-      if (t.id === task.id) {
-        return {
-          ...t,
-          subtasks: updated,
-        }
-      }
-      return t
-    })
+    const updatedTasks = [...tasks, newSubtaskTask]
     localStorage.setItem("way2b1_tasks", JSON.stringify(updatedTasks))
     
     // Оновлюємо локальний стан
-    setTask({ ...task, subtasks: updated })
+    const newSubtask: Subtask = {
+      id: newSubtaskId,
+      name: "New subtask",
+      status: "To Do",
+      assignees: task.assignee ? [task.assignee] : [],
+      priority: "Normal",
+      dueDate: undefined,
+    }
+    setLocalSubtasks([...localSubtasks, newSubtask])
     
     // Dispatch event to notify components
     window.dispatchEvent(new CustomEvent("taskUpdated"))
@@ -264,7 +341,7 @@ export default function TaskDetailPage() {
       <div className="flex h-screen bg-background">
         <Sidebar onStartTutorial={() => {}} onOpenTutorialCenter={() => {}} />
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-muted-foreground">Завантаження...</p>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     )
@@ -289,13 +366,32 @@ export default function TaskDetailPage() {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <button
-                      onClick={() => router.push("/tasks")}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                      Go to Tasks
-                    </button>
+                    {/* Breadcrumbs */}
+                    <nav className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <button
+                        onClick={() => router.push("/tasks")}
+                        className="hover:text-foreground transition-colors"
+                      >
+                        Tasks
+                      </button>
+                      {isSubtask && parentTask && (
+                        <>
+                          <span>/</span>
+                          <button
+                            onClick={() => router.push(`/tasks/${parentTask.id}`)}
+                            className="hover:text-foreground transition-colors"
+                          >
+                            {parentTask.title || parentTask.name}
+                          </button>
+                        </>
+                      )}
+                      {task && (
+                        <>
+                          <span>/</span>
+                          <span className="text-foreground">{task.title || task.name}</span>
+                        </>
+                      )}
+                    </nav>
                   </div>
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
@@ -375,48 +471,29 @@ export default function TaskDetailPage() {
                   >
                     Description
                   </button>
-                  <button
-                    onClick={() => scrollToSection("subtasks")}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      activeSection === "subtasks"
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-secondary"
-                    }`}
-                  >
-                    Subtasks
-                  </button>
+                  {!isSubtask && (
+                    <button
+                      onClick={() => scrollToSection("subtasks")}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        activeSection === "subtasks"
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:bg-secondary"
+                      }`}
+                    >
+                      Subtasks
+                    </button>
+                  )}
                 </nav>
               </div>
 
               {/* Main Content */}
               <div className="flex-1 overflow-y-auto">
                 <div className="p-6 space-y-8">
-                  {/* Summary Section */}
-                  {showSummary && (
+                  {/* Summary Section - тільки для звичайних тасок, не для сабтасок */}
+                  {!isSubtask && (
                     <section id="summary" className="scroll-mt-6">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="w-5 h-5 text-primary" />
-                          <h3 className="text-lg font-semibold text-foreground">Summary</h3>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                            aria-label="Update summary"
-                          >
-                            <RefreshCw className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowSummary(false)}
-                            className="h-6 px-3 text-xs font-semibold border border-border hover:bg-secondary"
-                          >
-                            Hide
-                          </Button>
-                        </div>
+                      <div className="mb-3">
+                        <h3 className="text-lg font-semibold text-foreground">Summary</h3>
                       </div>
                       <div className="border border-blue-200 rounded-lg p-4 bg-blue-50/50">
                         <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
@@ -477,7 +554,7 @@ export default function TaskDetailPage() {
                             }}
                             className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-md border-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary"
                           >
-                            <option value="Created">Created</option>
+                            <option value="To Do">To Do</option>
                             <option value="In Progress">In Progress</option>
                             <option value="Review">Review</option>
                             <option value="Done">Done</option>
@@ -546,47 +623,105 @@ export default function TaskDetailPage() {
                     </div>
                     <div className="rounded-md hover:bg-secondary/30 max-w-[696px] border border-border p-4 min-h-[112px]">
                       <div className="prose prose-sm max-w-full">
-                        <h2 className="text-2xl font-bold text-foreground my-3">Welcome!</h2>
-                        <p className="my-3 text-foreground">
-                          We've created a few quick tasks to help you get started. Complete them in any order—they'll take about 5 minutes total. Mark each subtask complete as you go. Need help? Click the [?] icon or visit our{" "}
-                          <a href="#" className="text-primary hover:underline">
-                            Help Center
-                          </a>
-                        </p>
+                        {/* Для головної онбординг таски показуємо стандартний текст */}
+                        {!isSubtask && task.name === "Welcome to NextGen — Your Quick Start Guide" && (
+                          <>
+                            <h2 className="text-lg font-bold text-foreground my-3">Welcome!</h2>
+                            <p className="my-3 text-sm text-foreground leading-relaxed">
+                              We've prepared a few quick steps to help you feel at home.
+                            </p>
+                            <p className="my-3 text-sm text-foreground leading-relaxed">
+                              You can complete them in any order — the whole onboarding takes about 5 minutes.
+                            </p>
+                            <p className="my-3 text-sm text-foreground leading-relaxed">
+                              Check off each subtask as you go.
+                            </p>
+                            <p className="my-3 text-sm text-foreground leading-relaxed">
+                              Need help? Click the ? icon or visit our{" "}
+                              <a href="#" className="text-primary hover:underline">
+                                Help Center
+                              </a>{" "}
+                              anytime.
+                            </p>
+                          </>
+                        )}
+                        
+                        {/* Для сабтасок показуємо весь контент */}
+                        {isSubtask && (
+                          <div className="space-y-4">
+                            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                              {task.description}
+                            </p>
+                            
+                            {task.whatYouLearn && (
+                              <div className="pt-3 border-t border-border">
+                                <h4 className="text-sm font-semibold text-foreground mb-2">What you'll learn:</h4>
+                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                  {task.whatYouLearn}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Пошагові інструкції */}
+                            {task.showHowSteps && task.showHowSteps.length > 0 && (
+                              <div className="pt-3 border-t border-border">
+                                <h4 className="text-sm font-semibold text-foreground mb-3">Step-by-step instructions:</h4>
+                                <ol className="space-y-2 pl-6">
+                                  {task.showHowSteps.map((step, index) => (
+                                    <li key={index} className="text-sm text-foreground leading-relaxed flex items-start gap-2">
+                                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-200 text-gray-900 text-xs font-semibold flex items-center justify-center">
+                                        {index + 1}
+                                      </span>
+                                      <span className="flex-1">{step}</span>
+                                    </li>
+                                  ))}
+                                </ol>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Для звичайних тасок (не онбординг) показуємо description, якщо є */}
+                        {!isSubtask && task.name !== "Welcome to NextGen — Your Quick Start Guide" && (
+                          <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                            {task.description || "No description provided."}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </section>
 
-                  {/* Subtasks Section */}
-                  <section id="subtasks" className="scroll-mt-6">
-                    <div className="mb-4 flex items-center justify-between w-full">
-                      <h2 className="text-lg font-semibold text-foreground">Subtasks</h2>
-                      <div className="flex items-center gap-3">
-                        {localSubtasks.length > 0 && (
-                          <div className="flex items-center gap-2">
-                            <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-primary transition-all duration-500 ease-out"
-                                style={{ width: `${subtaskProgress}%` }}
-                              />
+                  {/* Subtasks Section - тільки для звичайних тасок, не для сабтасок */}
+                  {!isSubtask && (
+                    <section id="subtasks" className="scroll-mt-6">
+                      <div className="mb-4 flex items-center justify-between w-full">
+                        <h2 className="text-lg font-semibold text-foreground">Subtasks</h2>
+                        <div className="flex items-center gap-3">
+                          {localSubtasks.length > 0 && (
+                            <div className="flex items-center gap-2">
+                              <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-primary transition-all duration-500 ease-out"
+                                  style={{ width: `${subtaskProgress}%` }}
+                                />
+                              </div>
+                              <span className="text-sm font-medium text-muted-foreground">
+                                {completedSubtasksCount}/{totalSubtasksCount}
+                              </span>
+                              <Info className="w-4 h-4 text-muted-foreground" />
                             </div>
-                            <span className="text-sm font-medium text-muted-foreground">
-                              {completedSubtasksCount}/{totalSubtasksCount}
-                            </span>
-                            <Info className="w-4 h-4 text-muted-foreground" />
-                          </div>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleAddSubtask}
-                          className="gap-2"
-                        >
-                          <Plus className="w-4 h-4" />
-                          Add subtask
-                        </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleAddSubtask}
+                            className="gap-2"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Add subtask
+                          </Button>
+                        </div>
                       </div>
-                    </div>
 
                     {localSubtasks.length > 0 ? (
                       <div className="border border-border rounded-lg overflow-hidden">
@@ -616,12 +751,7 @@ export default function TaskDetailPage() {
                               return (
                                 <tr 
                                   key={subtask.id} 
-                                  onClick={() => {
-                                    handleSubtaskUpdate(subtask.id, {
-                                      status: isDone ? "Created" : "Done",
-                                    })
-                                  }}
-                                  className={`hover:bg-secondary/30 transition-colors cursor-pointer ${
+                                  className={`hover:bg-secondary/30 transition-colors ${
                                     isDone ? "opacity-60" : ""
                                   }`}
                                 >
@@ -631,29 +761,20 @@ export default function TaskDetailPage() {
                                         checked={isDone}
                                         onCheckedChange={(checked) => {
                                           handleSubtaskUpdate(subtask.id, {
-                                            status: checked ? "Done" : "Created",
+                                            status: checked ? "Done" : "To Do",
                                           })
                                         }}
                                         onClick={(e) => e.stopPropagation()}
                                       />
-                                      <input
-                                        type="text"
-                                        value={subtask.name}
-                                        onChange={(e) => {
-                                          handleSubtaskUpdate(subtask.id, { name: e.target.value })
+                                      <span
+                                        onClick={() => {
+                                          // Відкриваємо сторінку деталей сабтаски (як окремої таски)
+                                          router.push(`/tasks/${subtask.id}`)
                                         }}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className={`flex-1 text-sm bg-transparent border-none focus:outline-none focus:ring-0 p-0 ${
-                                          isDone 
-                                            ? "line-through text-muted-foreground" 
-                                            : "text-foreground"
-                                        }`}
-                                        onBlur={(e) => {
-                                          if (!e.target.value.trim()) {
-                                            handleSubtaskUpdate(subtask.id, { name: "New subtask" })
-                                          }
-                                        }}
-                                      />
+                                        className="flex-1 text-sm cursor-pointer hover:text-primary transition-colors text-foreground"
+                                      >
+                                        {subtask.name}
+                                      </span>
                                     </div>
                                   </td>
                                   <td className="px-4 py-3">
@@ -696,7 +817,8 @@ export default function TaskDetailPage() {
                         </p>
                       </div>
                     )}
-                  </section>
+                    </section>
+                  )}
                 </div>
               </div>
             </div>
@@ -715,7 +837,7 @@ export default function TaskDetailPage() {
             </div>
 
             {/* Comments Content */}
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div id="comments" className="flex-1 flex flex-col overflow-hidden">
               {/* Search */}
               <div className="p-4 border-b border-border">
                 <div className="relative">
@@ -847,6 +969,18 @@ export default function TaskDetailPage() {
         message={toast.message}
         onClose={() => setToast({ show: false, message: "" })}
       />
+
+      {/* Інтерактивний гайд для сабтасок */}
+      {isSubtask && (
+        <SubtaskInteractiveGuide
+          targetElementId={task.targetElementId}
+          targetUrl={task.targetUrl}
+          scrollToSection={task.scrollToSection}
+          showHowSteps={task.showHowSteps}
+          isVisible={showHowTo}
+          onClose={() => setShowHowTo(false)}
+        />
+      )}
     </div>
   )
 }

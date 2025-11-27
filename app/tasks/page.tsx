@@ -9,8 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { TasksEmptyState } from "@/components/tasks-empty-state"
 import { TasksTable } from "@/components/tasks-table"
 import { AdvancedFiltersModal } from "@/components/advanced-filters-modal"
-import { TasksOnboardingHotspot } from "@/components/tasks-onboarding-hotspot"
-import { ContextualTooltip } from "@/components/contextual-tooltips/ContextualTooltip"
+import { SequentialTooltips } from "@/components/contextual-tooltips/SequentialTooltips"
 import {
   Plus,
   Search,
@@ -43,7 +42,7 @@ const mockTasks = [
     taskId: "PROJ-7",
     name: "Vendor shortlisting...",
     priority: "Normal",
-    status: "Created",
+    status: "To Do",
     assignee: "MR Mohamed Raafat",
     dueDate: "Oct 31, 2025",
     reporter: "AM Anastasiya Mudryk",
@@ -56,7 +55,7 @@ const mockTasks = [
     taskId: "FAC-14",
     name: "Finalize contractor...",
     priority: "Normal",
-    status: "Created",
+    status: "To Do",
     assignee: "A A A AM",
     dueDate: "Oct 24, 2025",
     reporter: "RL Richard Lopes",
@@ -69,7 +68,7 @@ const mockTasks = [
     taskId: "TEST-9",
     name: "Complete interior d...",
     priority: "Normal",
-    status: "Created",
+    status: "To Do",
     assignee: "MM Marcus Mota",
     dueDate: "—",
     reporter: "MR Mohamed Raafat",
@@ -82,7 +81,7 @@ const mockTasks = [
     taskId: "EST-3",
     name: "Design & Permitting",
     priority: "Normal",
-    status: "Created",
+    status: "To Do",
     assignee: "VM Volodymyr Merlenko",
     dueDate: "—",
     reporter: "MM Marcus Mota",
@@ -212,7 +211,7 @@ export default function TasksPage() {
       taskId: `TASK-${tasks.length + 1}`,
       name: "New task",
       priority: "Normal",
-      status: "Created",
+      status: "To Do",
       assignee: "—",
       dueDate: "—",
       reporter: "—",
@@ -406,7 +405,6 @@ export default function TasksPage() {
               </div>
             </div>
 
-
             {/* Content Area */}
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               {hasTasks ? (
@@ -436,54 +434,39 @@ export default function TasksPage() {
         </main>
       </div>
 
-      {/* Contextual Tooltips */}
-      <ContextualTooltip
-        tooltipKey="tasks-filter"
-        targetElementId="tasks-advanced-filters"
-        message="Use advanced filters to narrow down tasks by multiple criteria (AND logic)"
-        position="bottom"
-        delay={2000}
-      />
-      <ContextualTooltip
-        tooltipKey="tasks-columns"
-        targetElementId="tasks-table-customization"
-        message="Customize your table view by selecting which columns to display and reordering them"
-        position="bottom"
-        delay={2500}
-      />
-      <ContextualTooltip
-        tooltipKey="tasks-new-task"
-        targetElementId="tasks-new-task-button"
-        message="Create a new task to track work items, assign them to team members, and set priorities"
-        position="left"
-        delay={3000}
-      />
-      <ContextualTooltip
-        tooltipKey="tasks-quick-filters"
-        targetElementId="tasks-quick-filters-chips"
-        message="Quick filters work as UNION - they show all tasks matching ANY selected filter"
-        position="bottom"
-        delay={3500}
+      {/* Sequential Contextual Tooltips */}
+      <SequentialTooltips
+        tooltips={[
+          {
+            tooltipKey: "tasks-filter",
+            targetElementId: "tasks-advanced-filters",
+            message: "Use advanced filters to narrow down tasks by multiple criteria (AND logic)",
+            position: "bottom"
+          },
+          {
+            tooltipKey: "tasks-columns",
+            targetElementId: "tasks-table-customization",
+            message: "Customize your table view by selecting which columns to display and reordering them",
+            position: "bottom"
+          },
+          {
+            tooltipKey: "tasks-new-task",
+            targetElementId: "tasks-new-task-button",
+            message: "Create a new task to track work items, assign them to team members, and set priorities",
+            position: "left"
+          },
+          {
+            tooltipKey: "tasks-quick-filters",
+            targetElementId: "tasks-quick-filters-chips",
+            message: "Quick filters work as UNION - they show all tasks matching ANY selected filter",
+            position: "bottom"
+          }
+        ]}
+        startDelay={2000}
+        gapBetweenTooltips={3000}
+        storageKey="tasks_sequential_tooltips"
       />
 
-
-      {/* Onboarding Task Hotspot */}
-      {tasks.length > 0 && (() => {
-        const onboardingTask = tasks.find(
-          (task: any) => task.name === "Welcome to NextGen — Your Quick Start Guide"
-        )
-        if (onboardingTask) {
-          return (
-            <TasksOnboardingHotspot
-              taskId={onboardingTask.id}
-              onTaskClick={() => {
-                router.push(`/tasks/${onboardingTask.id}`)
-              }}
-            />
-          )
-        }
-        return null
-      })()}
 
     </div>
   )

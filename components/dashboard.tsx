@@ -1,11 +1,12 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Workflow, Info, MoreHorizontal, ChevronDown, Target, HelpCircle } from "lucide-react"
+import { Plus, Workflow, Info, MoreHorizontal, ChevronDown, Target, X } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ContextualTooltip } from "@/components/contextual-tooltips/ContextualTooltip"
+import { HoverTooltip } from "@/components/ui/hover-tooltip"
+import { TaskRowTooltip } from "@/components/ui/task-row-tooltip"
 
 export function Dashboard() {
   const [userName, setUserName] = useState("")
@@ -13,7 +14,23 @@ export function Dashboard() {
   const [tasks, setTasks] = useState<any[]>([])
   const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
+
+  // Розкриваємо всі таски з сабтасками за замовчуванням
+  useEffect(() => {
+    const tasksWithSubtasks = tasks
+      .filter((t: any) => !t.parentTaskId)
+      .filter((task: any) => {
+        const taskSubtasks = tasks.filter((t: any) => t.parentTaskId === task.id)
+        return taskSubtasks.length > 0
+      })
+      .map((task: any) => task.id)
+    
+    if (tasksWithSubtasks.length > 0) {
+      setExpandedTasks(new Set(tasksWithSubtasks))
+    }
+  }, [tasks])
   const [showPulsingButton, setShowPulsingButton] = useState(false)
+  const [isBannerDismissed, setIsBannerDismissed] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -108,8 +125,26 @@ export function Dashboard() {
     return true
   })
   
-  // Показуємо банер тільки якщо є onboarding tasks і вони не всі завершені
-  const showOnboardingBanner = hasOnboardingTasks && !allOnboardingTasksCompleted
+  // Перевіряємо чи банер був закритий
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const dismissed = localStorage.getItem("way2b1_onboarding_banner_dismissed")
+      if (dismissed === "true") {
+        setIsBannerDismissed(true)
+      }
+    }
+  }, [])
+
+  // Показуємо банер тільки якщо є onboarding tasks, вони не всі завершені, і банер не закритий
+  const showOnboardingBanner = hasOnboardingTasks && !allOnboardingTasksCompleted && !isBannerDismissed
+
+  // Обробник закриття банера
+  const handleDismissBanner = () => {
+    setIsBannerDismissed(true)
+    if (typeof window !== "undefined") {
+      localStorage.setItem("way2b1_onboarding_banner_dismissed", "true")
+    }
+  }
 
   // Перевіряємо чи користувач вже бачив мигаючу кнопку (тільки один раз)
   useEffect(() => {
@@ -156,22 +191,32 @@ export function Dashboard() {
               </h1>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                id="home-new-task-button"
-                onClick={handleCreateTask}
-                className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+              <HoverTooltip
+                message="Click here to create a new task and start organizing your work"
+                position="bottom"
               >
-                <Plus className="w-4 h-4" />
-                New task
-              </button>
-              <button
-                id="home-new-decision-button"
-                onClick={handleCreateDecision}
-                className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                <button
+                  id="home-new-task-button"
+                  onClick={handleCreateTask}
+                  className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  New task
+                </button>
+              </HoverTooltip>
+              <HoverTooltip
+                message="Create a decision to track important choices and approvals"
+                position="bottom"
               >
-                <Plus className="w-4 h-4" />
-                New decision
-              </button>
+                <button
+                  id="home-new-decision-button"
+                  onClick={handleCreateDecision}
+                  className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  New decision
+                </button>
+              </HoverTooltip>
             </div>
           </div>
           <div className="border-b border-gray-200 mt-4"></div>
@@ -179,22 +224,6 @@ export function Dashboard() {
       )}
 
       {/* Onboarding Banner - прибрано, оскільки тепер підсвітка в таблиці */}
-
-      {/* Contextual Tooltips */}
-      <ContextualTooltip
-        tooltipKey="new-task"
-        targetElementId="home-new-task-button"
-        message="Click here to create a new task and start organizing your work"
-        position="bottom"
-        delay={2000}
-      />
-      <ContextualTooltip
-        tooltipKey="new-decision"
-        targetElementId="home-new-decision-button"
-        message="Create a decision to track important choices and approvals"
-        position="bottom"
-        delay={2500}
-      />
 
       {/* Content sections */}
       <div className="flex-1 px-16 py-6 space-y-6">
@@ -236,49 +265,35 @@ export function Dashboard() {
               New Task
             </button>
           </div>
+          
+          {/* Onboarding Banner - вище таблиці */}
+          {showOnboardingBanner && (
+            <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 px-6 py-4 relative mb-6 rounded-lg">
+              {/* Кнопка закриття */}
+              <button
+                onClick={handleDismissBanner}
+                className="absolute top-4 right-4 p-1.5 hover:bg-blue-100 rounded-lg transition-colors z-10"
+                aria-label="Dismiss banner"
+              >
+                <X className="w-4 h-4 text-blue-700" />
+              </button>
+
+              <div className="flex items-center gap-3 pr-8">
+                <Target className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-blue-900 mb-1">
+                    ONBOARDING TASKS
+                  </h3>
+                  <p className="text-xs text-blue-700 leading-relaxed">
+                    Complete tasks with <span className="font-semibold">"Onboarding"</span> badge below. These tasks will help you get familiar with the platform and learn how to use key features in just 5-6 minutes.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {tasks.length > 0 ? (
             <div className="border border-border rounded-lg overflow-hidden">
-              {/* Onboarding Banner */}
-              {showOnboardingBanner && (
-                <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 border-b-2 border-blue-400 shadow-sm px-6 py-4 relative">
-                  <div className="flex items-center gap-3">
-                    <div className={`relative w-10 h-10 rounded-full bg-blue-200 flex items-center justify-center flex-shrink-0 shadow-sm ${
-                      showPulsingButton ? 'animate-pulse' : ''
-                    }`}>
-                      <Target className="w-5 h-5 text-blue-700" />
-                      {/* Hotspot indicator */}
-                      {showPulsingButton && (
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></div>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-bold text-blue-900">
-                          ONBOARDING TASKS
-                        </h3>
-                        <span className={`px-2 py-0.5 text-xs font-bold bg-blue-300 text-blue-900 rounded-full uppercase tracking-wide ${
-                          showPulsingButton ? 'animate-pulse' : ''
-                        }`}>
-                          Get Started
-                        </span>
-                        {/* Hotspot tooltip trigger */}
-                        <div className="relative group">
-                          <HelpCircle className="w-4 h-4 text-blue-600 cursor-help" />
-                          <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block z-10">
-                            <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 whitespace-nowrap shadow-lg">
-                              These tasks will help you get familiar with the platform
-                              <div className="absolute left-2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <p className="text-xs text-blue-700 mt-1">
-                        Complete tasks with <span className="font-semibold">"Onboarding"</span> badge below
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-secondary/30 border-b border-border">
@@ -304,16 +319,17 @@ export function Dashboard() {
                         DUE DATE
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        REPORTER
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         CATEGORY
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-card divide-y divide-border">
-                    {tasks.map((task) => {
-                      const hasSubtasks = task.subtasks && task.subtasks.length > 0
+                    {tasks
+                      .filter((t: any) => !t.parentTaskId) // Показуємо тільки основні таски, не сабтаски
+                      .map((task) => {
+                      // Знаходимо сабтаски для цієї таски (таски з parentTaskId = task.id)
+                      const taskSubtasks = tasks.filter((t: any) => t.parentTaskId === task.id)
+                      const hasSubtasks = taskSubtasks.length > 0 || (task.subtasks && task.subtasks.length > 0)
                       const isExpanded = expandedTasks.has(task.id)
                       const isOnboarding = task.name === "Welcome to NextGen — Your Quick Start Guide" || task.category === "Onboarding"
                       const taskId = task.id
@@ -321,43 +337,46 @@ export function Dashboard() {
                       const displayId = task.taskId || task.id
                       const taskName = task.title || task.name
                       
+                      // Create ref for this row
+                      const rowRef = { current: null as HTMLTableRowElement | null }
+
                       return (
                         <React.Fragment key={taskId}>
                           {/* Task Row */}
+                          <TaskRowTooltip task={task} rowRef={rowRef as React.RefObject<HTMLTableRowElement>} />
                           <tr
+                            ref={(el) => { rowRef.current = el }}
                             onClick={(e) => {
-                              // Якщо клікнули на checkbox - не виконуємо інші дії
-                              if ((e.target as HTMLElement).closest('input[type="checkbox"]')) {
-                                return
-                              }
-                              // Якщо клікнули на назву task - переходимо на сторінку деталей
-                              if ((e.target as HTMLElement).closest('span[title]')) {
-                                handleTaskClick(task)
-                                return
-                              }
-                              // Якщо клікнули на dropdown button - не toggle статус
-                              if ((e.target as HTMLElement).closest('button')) {
-                                return
-                              }
-                              // Для task - toggle статус при кліку по рядку
-                              const newStatus = task.status === "Done" ? "Created" : "Done"
-                              const updatedTasks = tasks.map((t: any) => 
-                                t.id === task.id ? { ...t, status: newStatus } : t
-                              )
-                              localStorage.setItem("way2b1_tasks", JSON.stringify(updatedTasks))
-                              setTasks(updatedTasks)
-                              window.dispatchEvent(new CustomEvent("taskUpdated"))
-                            }}
-                            className={`hover:bg-secondary/30 transition-colors cursor-pointer ${
-                              task.status === "Done" ? 'opacity-60' : ''
-                            }`}
-                          >
-                            <td className="px-4 py-3 whitespace-nowrap">
+                                // Якщо клікнули на checkbox - не виконуємо інші дії
+                                if ((e.target as HTMLElement).closest('input[type="checkbox"]')) {
+                                  return
+                                }
+                                // Якщо клікнули на назву task - переходимо на сторінку деталей
+                                if ((e.target as HTMLElement).closest('span[title]')) {
+                                  handleTaskClick(task)
+                                  return
+                                }
+                                // Якщо клікнули на dropdown button - не toggle статус
+                                if ((e.target as HTMLElement).closest('button')) {
+                                  return
+                                }
+                                // Для task - toggle статус при кліку по рядку
+                                const newStatus = task.status === "Done" ? "To Do" : "Done"
+                                const updatedTasks = tasks.map((t: any) => 
+                                  t.id === task.id ? { ...t, status: newStatus } : t
+                                )
+                                localStorage.setItem("way2b1_tasks", JSON.stringify(updatedTasks))
+                                setTasks(updatedTasks)
+                                window.dispatchEvent(new CustomEvent("taskUpdated"))
+                              }}
+                              className="hover:bg-secondary/30 transition-colors cursor-pointer"
+                            >
+                                <td className="px-4 py-3 whitespace-nowrap">
                               <Checkbox
                                 checked={task.status === "Done"}
                                 onCheckedChange={(checked) => {
                                   // Toggle статус task при кліку на checkbox
-                                  const newStatus = checked ? "Done" : "Created"
+                                  const newStatus = checked ? "Done" : "To Do"
                                   const updatedTasks = tasks.map((t: any) => 
                                     t.id === task.id ? { ...t, status: newStatus } : t
                                   )
@@ -390,11 +409,7 @@ export function Dashboard() {
                                     e.stopPropagation()
                                     handleTaskClick(task)
                                   }}
-                                  className={`truncate max-w-xs hover:text-primary transition-colors cursor-pointer ${
-                                    task.status === "Done" 
-                                      ? 'line-through text-muted-foreground' 
-                                      : ''
-                                  }`}
+                                  className="truncate max-w-xs hover:text-primary transition-colors cursor-pointer"
                                   title={taskName}
                                 >
                                   {taskName}
@@ -413,7 +428,7 @@ export function Dashboard() {
                                   ? "bg-green-100 text-green-700"
                                   : task.status === "In Progress" 
                                   ? "bg-blue-100 text-blue-700" 
-                                  : task.status === "Created" || !task.status
+                                  : task.status === "To Do" || !task.status
                                   ? "bg-gray-100 text-gray-700"
                                   : "bg-blue-100 text-blue-700"
                               }`}>
@@ -436,111 +451,112 @@ export function Dashboard() {
                               {task.dueDate && task.dueDate !== "—" ? task.dueDate : "—"}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
-                              {task.reporter ? (
-                                <div className="flex items-center gap-2">
-                                  <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-700">
-                                    {task.reporter.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
-                                  </div>
-                                  <span>{task.reporter}</span>
-                                </div>
-                              ) : (
-                                "—"
-                              )}
+                              {isOnboarding ? "Onboarding" : (task.category || "—")}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
-                              {task.category || "—"}
-                            </td>
-                          </tr>
+                            </tr>
                           
                           {/* Subtasks Rows - показуємо тільки якщо task розгорнутий */}
-                          {hasSubtasks && isExpanded && task.subtasks.map((subtask: any) => {
-                            const isDone = subtask.status === "Done"
-                            const subtaskId = `${taskId}-${subtask.id}`
-                            const isSubtaskSelected = selectedItems.includes(subtaskId)
+                          {hasSubtasks && isExpanded && (() => {
+                            // Використовуємо окремі таски-сабтаски, якщо є, інакше старі subtasks для зворотної сумісності
+                            const subtasksToShow = taskSubtasks.length > 0 
+                              ? taskSubtasks 
+                              : (task.subtasks || []).map((st: any) => ({
+                                  id: st.id,
+                                  name: st.name,
+                                  status: st.status,
+                                  priority: st.priority,
+                                  assignee: st.assignees && st.assignees.length > 0 ? st.assignees[0] : undefined,
+                                }))
                             
-                            return (
-                              <tr
-                                key={subtaskId}
-                                onClick={(e) => {
-                                  if ((e.target as HTMLElement).closest('input[type="checkbox"]')) {
-                                    return
-                                  }
-                                  // Для subtask - toggle статус при кліку
-                                  const newStatus = isDone ? "Created" : "Done"
-                                  const updatedTasks = tasks.map((t: any) => {
-                                    if (t.id === task.id) {
-                                      const updatedSubtasks = (t.subtasks || []).map((st: any) => 
-                                        st.id === subtask.id ? { ...st, status: newStatus } : st
-                                      )
-                                      return { ...t, subtasks: updatedSubtasks }
-                                    }
-                                    return t
-                                  })
-                                  localStorage.setItem("way2b1_tasks", JSON.stringify(updatedTasks))
-                                  setTasks(updatedTasks)
-                                  window.dispatchEvent(new CustomEvent("taskUpdated"))
-                                }}
-                                className={`hover:bg-secondary/30 transition-colors cursor-pointer ${
-                                  isDone ? 'opacity-60' : ''
-                                }`}
-                              >
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  <Checkbox
-                                    checked={isSubtaskSelected}
-                                    onCheckedChange={(checked) => {
-                                      if (checked) {
-                                        setSelectedItems([...selectedItems, subtaskId])
-                                      } else {
-                                        setSelectedItems(selectedItems.filter(id => id !== subtaskId))
-                                      }
+                            return subtasksToShow.map((subtask: any) => {
+                              const isDone = subtask.status === "Done"
+                              const subtaskId = subtask.id
+                              const isSubtaskSelected = selectedItems.includes(subtaskId)
+                              
+                              // Create ref for this subtask row
+                              const subtaskRowRef = { current: null as HTMLTableRowElement | null }
+
+                              return (
+                                <React.Fragment key={subtaskId}>
+                                  <TaskRowTooltip task={subtask} rowRef={subtaskRowRef as React.RefObject<HTMLTableRowElement>} />
+                                  <tr
+                                    ref={(el) => { subtaskRowRef.current = el }}
+                                    className="hover:bg-secondary/30 transition-colors"
+                                  >
+                                  <td className="px-4 py-3 whitespace-nowrap">
+                                    <Checkbox
+                                      checked={isDone}
+                                      onCheckedChange={(checked) => {
+                                        // Toggle статус сабтаски при кліку на чекбокс
+                                        const newStatus = checked ? "Done" : "To Do"
+                                        const updatedTasks = tasks.map((t: any) => {
+                                          if (t.id === subtaskId) {
+                                            // Оновлюємо таску-сабтаску
+                                            return { ...t, status: newStatus, lastModified: new Date().toISOString() }
+                                          }
+                                          return t
+                                        })
+                                        localStorage.setItem("way2b1_tasks", JSON.stringify(updatedTasks))
+                                        setTasks(updatedTasks)
+                                        window.dispatchEvent(new CustomEvent("taskUpdated"))
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                  </td>
+                                  <td 
+                                    className="px-4 py-3 text-sm text-foreground cursor-pointer"
+                                    onClick={() => {
+                                      // Відкриваємо сторінку деталей сабтаски
+                                      router.push(`/tasks/${subtask.id}`)
                                     }}
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                </td>
-                                <td className="px-4 py-3 text-sm text-foreground">
-                                  <div className="flex items-center gap-2 pl-10">
-                                    <span 
-                                      className={`truncate max-w-xs ${
-                                        isDone 
-                                          ? 'line-through text-muted-foreground' 
-                                          : 'text-foreground'
-                                      }`}
-                                      title={subtask.name}
-                                    >
-                                      {subtask.name}
+                                  >
+                                    <div className="flex items-center gap-2 pl-10">
+                                      <span 
+                                        className="truncate max-w-xs hover:text-primary transition-colors text-foreground"
+                                        title={subtask.name || subtask.title}
+                                      >
+                                        {subtask.name || subtask.title}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
+                                    {subtask.taskId || subtask.id}
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
+                                    {subtask.priority ? `= ${subtask.priority}` : "= Normal"}
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap">
+                                    <span className={`text-xs font-medium px-2 py-1 rounded-md ${
+                                      isDone
+                                        ? "bg-green-100 text-green-700"
+                                        : "bg-gray-100 text-gray-700"
+                                    }`}>
+                                      {isDone ? "Done" : "To Do"}
                                     </span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
-                                  —
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
-                                  {subtask.priority ? `= ${subtask.priority}` : "= Normal"}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  <span className={`text-xs font-medium px-2 py-1 rounded-md ${
-                                    isDone
-                                      ? "bg-green-100 text-green-700"
-                                      : "bg-gray-100 text-gray-700"
-                                  }`}>
-                                    {isDone ? "Done" : "To Do"}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground">
-                                  —
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
-                                  —
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
-                                  —
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
-                                  —
-                                </td>
-                              </tr>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground">
+                                    {subtask.assignee ? (
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-700">
+                                          {subtask.assignee.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                                        </div>
+                                        <span>{subtask.assignee}</span>
+                                      </div>
+                                    ) : (
+                                      "—"
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
+                                    —
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
+                                    {subtask.category || "Onboarding"}
+                                  </td>
+                                </tr>
+                              </React.Fragment>
                             )
-                          })}
+                            })
+                          })()}
                         </React.Fragment>
                       )
                     })}
