@@ -501,12 +501,19 @@ export default function DecisionsPage() {
               </div>
 
               {/* Breadcrumb & Share */}
-              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>Decisions</span>
-                  <span>/</span>
-                  <span>New decision</span>
-                </div>
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between min-w-0">
+                <nav className="flex items-center gap-1.5 text-sm text-muted-foreground min-w-0 flex-1" aria-label="Breadcrumb">
+                  <button
+                    onClick={() => router.push("/decisions")}
+                    className="hover:text-foreground transition-colors flex-shrink-0 px-1.5 py-0.5 rounded hover:bg-secondary/50"
+                  >
+                    Decisions
+                  </button>
+                  <span className="flex-shrink-0 text-muted-foreground/60">/</span>
+                  <span className="text-foreground truncate max-w-[200px] px-1.5 py-0.5" title="New decision">
+                    New decision
+                  </span>
+                </nav>
                 <button className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                   <Share2 className="w-4 h-4" />
                   Share

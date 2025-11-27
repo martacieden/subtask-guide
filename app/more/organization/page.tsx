@@ -51,12 +51,28 @@ export default function OrganizationProfilePage() {
         <main className="flex-1 overflow-auto p-6">
           <div className="max-w-4xl mx-auto">
             {/* Breadcrumbs */}
-            <div className="mb-6 text-sm text-muted-foreground">
-              <span className="hover:text-foreground cursor-pointer">Admin</span>
-              <span className="mx-2">/</span>
-              <span className="hover:text-foreground cursor-pointer">{organizationName}</span>
-              <span className="mx-2">/</span>
-              <span className="text-foreground">Organization profile</span>
+            <div className="mb-6 min-w-0">
+              <nav className="flex items-center gap-1.5 text-sm text-muted-foreground min-w-0" aria-label="Breadcrumb">
+                <button
+                  onClick={() => router.push("/more")}
+                  className="hover:text-foreground transition-colors flex-shrink-0 px-1.5 py-0.5 rounded hover:bg-secondary/50 truncate max-w-[150px]"
+                  title="Admin"
+                >
+                  Admin
+                </button>
+                <span className="flex-shrink-0 text-muted-foreground/60">/</span>
+                <button
+                  onClick={() => router.push("/more/organization")}
+                  className="hover:text-foreground transition-colors flex-shrink-0 px-1.5 py-0.5 rounded hover:bg-secondary/50 truncate max-w-[200px]"
+                  title={organizationName}
+                >
+                  {organizationName}
+                </button>
+                <span className="flex-shrink-0 text-muted-foreground/60">/</span>
+                <span className="text-foreground truncate max-w-[200px] px-1.5 py-0.5" title="Organization profile">
+                  Organization profile
+                </span>
+              </nav>
             </div>
 
             {/* Page Title */}

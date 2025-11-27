@@ -365,21 +365,22 @@ export default function TaskDetailPage() {
             <div className="border-b border-border bg-card px-6 py-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-2 min-w-0">
                     {/* Breadcrumbs */}
-                    <nav className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <nav className="flex items-center gap-1.5 text-sm text-muted-foreground min-w-0 flex-1" aria-label="Breadcrumb">
                       <button
                         onClick={() => router.push("/tasks")}
-                        className="hover:text-foreground transition-colors"
+                        className="hover:text-foreground transition-colors flex-shrink-0 px-1.5 py-0.5 rounded hover:bg-secondary/50"
                       >
                         Tasks
                       </button>
                       {isSubtask && parentTask && (
                         <>
-                          <span>/</span>
+                          <span className="flex-shrink-0 text-muted-foreground/60">/</span>
                           <button
                             onClick={() => router.push(`/tasks/${parentTask.id}`)}
-                            className="hover:text-foreground transition-colors"
+                            className="hover:text-foreground transition-colors truncate max-w-[200px] px-1.5 py-0.5 rounded hover:bg-secondary/50"
+                            title={parentTask.title || parentTask.name}
                           >
                             {parentTask.title || parentTask.name}
                           </button>
@@ -387,8 +388,10 @@ export default function TaskDetailPage() {
                       )}
                       {task && (
                         <>
-                          <span>/</span>
-                          <span className="text-foreground">{task.title || task.name}</span>
+                          <span className="flex-shrink-0 text-muted-foreground/60">/</span>
+                          <span className="text-foreground truncate max-w-[200px] px-1.5 py-0.5" title={task.title || task.name}>
+                            {task.title || task.name}
+                          </span>
                         </>
                       )}
                     </nav>
